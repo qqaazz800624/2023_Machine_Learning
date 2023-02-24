@@ -80,9 +80,7 @@ class My_Model(nn.Module):
         super(My_Model, self).__init__()
         # TODO: modify model's structure, be aware of dimensions. 
         self.layers = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Linear(input_dim, 32),
             nn.ReLU(),
             nn.Linear(32, 16),
             nn.ReLU(),
@@ -96,6 +94,52 @@ class My_Model(nn.Module):
         x = x.squeeze(1) # (B, 1) -> (B)
         return x
 
+#%%
+'''
+
+device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
+config = {
+    'seed': 520,      # Your seed number, you can pick your lucky number. :)
+    'select_all': True,   # Whether to use all features.
+    'valid_ratio': 0.25,   # validation_size = train_size * valid_ratio
+    'n_epochs': 5000,     # Number of epochs.            
+    'batch_size': 256, 
+    'w_decay_rate': 0.005, # weight regularization
+    'learning_rate': 3e-4,              
+    'early_stop': 500,    # If model has not improved for this many consecutive epochs, stop training.     
+    'save_path': './models/model.ckpt'  # Your model will be saved here.
+}
+
+
+train_data, test_data = pd.read_csv('/home/u/qqaazz800624/2023_Machine_Learning/HW1/dataset/covid_train.csv').values, pd.read_csv('/home/u/qqaazz800624/2023_Machine_Learning/HW1/dataset/covid_test.csv').values
+train_data, valid_data = train_valid_split(train_data, config['valid_ratio'], config['seed'])
+
+y_train, y_valid = train_data[:,-1], valid_data[:,-1]
+raw_x_train, raw_x_valid, raw_x_test = train_data[:,:-1], valid_data[:,:-1], test_data
+
+select_k = 25
+fs = SelectKBest(score_func=f_regression, k=select_k)
+results = fs.fit(raw_x_train, y_train)
+feat_idx = fs.get_support(indices=True)
+setA = set([i for i in feat_idx])
+
+states = [i for i in range(1, 34)]
+covidlike = [35, 36, 53, 54, 71, 72] # covid-like illness
+positives = [52, 70] #tested positive before
+behaviors = [i for i in range(37,46)]+[i for i in range(55,69)] + [i for i in range(73,82)]# behaviors: wearing mask or shop indoors
+hunch = [49, 50, 51, 85, 86, 87]
+manual = states + covidlike + positives + behaviors + hunch
+setB = set(manual)
+
+setC = setB.union(setA)
+feat_idx = list(setC)
+print(feat_idx)
+
+
+'''
+
+
+#%% feature selection
 
 def select_feat(train_data, valid_data, test_data, select_all=True):
     '''Selects useful features to perform regression'''
@@ -108,18 +152,20 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
         # feat_idx = [0,1,2,3,4] # TODO: Select suitable feature columns.
         
         # select by anova
-        select_k = 30
+        select_k = 25
         fs = SelectKBest(score_func=f_regression, k=select_k)
         results = fs.fit(raw_x_train, y_train)
         feat_idx = fs.get_support(indices=True)
         setA = set([i for i in feat_idx])
         
-        # I think the following is important, so I choose artificial
-        zone = [i for i in range(1, 38)] # zone
-        pos4 = [53, 69, 85, 101] # positive rate of four day
-        lastday = [i for i in range(102, 117)] # the last day information
-        arti = zone+pos4+lastday
-        setB = set(arti)
+        # the following factors should be important, so I choose them manually
+        states = [i for i in range(1, 34)]
+        covidlike = [35, 36, 53, 54, 71, 72] # covid-like illness
+        positives = [52, 70] #tested positive before
+        behaviors = [i for i in range(37,46)]+[i for i in range(55,69)] + [i for i in range(73,82)]# behaviors: wearing mask or shop indoors
+        hunch = [49, 50, 51, 85, 86, 87]
+        manual = states + covidlike + positives + behaviors + hunch
+        setB = set(manual)
 
         # choose union
         setC = setB.union(setA)
@@ -128,7 +174,7 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
  
     return raw_x_train[:,feat_idx], raw_x_valid[:,feat_idx], raw_x_test[:,feat_idx], y_train, y_valid
 
-
+#%%
 
 def trainer(train_loader, valid_loader, model, config, device):
 
@@ -206,15 +252,15 @@ def trainer(train_loader, valid_loader, model, config, device):
 
 #%%
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
 config = {
     'seed': 520,      # Your seed number, you can pick your lucky number. :)
-    'select_all': True,   # Whether to use all features.
-    'valid_ratio': 0.2,   # validation_size = train_size * valid_ratio
+    'select_all': False,   # Whether to use all features.
+    'valid_ratio': 0.25,   # validation_size = train_size * valid_ratio
     'n_epochs': 5000,     # Number of epochs.            
     'batch_size': 256, 
     'w_decay_rate': 0.005, # weight regularization
-    'learning_rate': 1e-3,              
+    'learning_rate': 3e-4,              
     'early_stop': 500,    # If model has not improved for this many consecutive epochs, stop training.     
     'save_path': './models/model.ckpt'  # Your model will be saved here.
 }
@@ -271,7 +317,6 @@ save_pred(preds, 'pred.csv')
 
 #%%
 
-from IPython.display import FileLink
 FileLink(r'pred.csv')
 
 #%%
