@@ -20,7 +20,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
 # for feature selection
-from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.feature_selection import SelectKBest, f_regression, chi2
 from sklearn import preprocessing
 
 from IPython.display import FileLink
@@ -106,9 +106,9 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
     else:
         # feat_idx = [0,1,2,3,4] # TODO: Select suitable feature columns.
         
-        # select by anova
+        # select k best variables
         select_k = 25
-        fs = SelectKBest(score_func=f_regression, k=select_k)
+        fs = SelectKBest(score_func = f_regression, k=select_k)
         results = fs.fit(raw_x_train, y_train)
         feat_idx = fs.get_support(indices=True)
         setA = set([i for i in feat_idx])
@@ -137,8 +137,7 @@ def trainer(train_loader, valid_loader, model, config, device):
 
     # Define your optimization algorithm. 
     # TODO: Please check https://pytorch.org/docs/stable/optim.html to get more available algorithms.
-    # TODO: L2 regularization (optimizer(weight decay...) or implement by your self).
-    # optimizer = torch.optim.SGD(model.parameters(), lr=config['learning_rate'], momentum=0.7) 
+    # TODO: L2 regularization (optimizer(weight decay...) or implement by your self). 
     # change the optimizer from SGD to Adam
     optimizer = torch.optim.Adam(model.parameters()
                                 ,lr=config['learning_rate']
@@ -148,6 +147,8 @@ def trainer(train_loader, valid_loader, model, config, device):
                                  )
     writer = SummaryWriter() # Writer of tensoboard.
     val_interval=10
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=5, verbose=True)
 
     if not os.path.isdir('./models'):
         os.mkdir('./models') # Create directory of saving models.
@@ -173,39 +174,40 @@ def trainer(train_loader, valid_loader, model, config, device):
             loss_record.append(loss.detach().item())
             
             # Display current epoch number and loss on tqdm progress bar.
-            train_pbar.set_description(f'Epoch [{epoch+1}/{n_epochs}]')
-            train_pbar.set_postfix({'loss': loss.detach().item()})
+            # train_pbar.set_description(f'Epoch [{epoch+1}/{n_epochs}]')
+            # train_pbar.set_postfix({'loss': loss.detach().item()})
 
         mean_train_loss = sum(loss_record)/len(loss_record)
         writer.add_scalar('Loss/train', mean_train_loss, step)
+        scheduler.step(mean_train_loss)
 
         # Validation / Evaluation Part
-        model.eval() # Set your model to evaluation mode.
-        loss_record = []
-        for x, y in valid_loader:
-            x, y = x.to(device), y.to(device)
-            with torch.no_grad():
-                pred = model(x)
-                loss = criterion(pred, y)
+        if ((epoch+1)% val_interval ) == 0:
+            model.eval() # Set your model to evaluation mode.
+            loss_record = []
+            for x, y in valid_loader:
+                x, y = x.to(device), y.to(device)
+                with torch.no_grad():
+                    pred = model(x)
+                    loss = criterion(pred, y)
 
-            loss_record.append(loss.item())
+                loss_record.append(loss.item())
             
-        mean_valid_loss = sum(loss_record)/len(loss_record)
-        if (epoch + 1) % val_interval == 0:
+            mean_valid_loss = sum(loss_record)/len(loss_record)
             print(f'Epoch [{epoch+1}/{n_epochs}]: Train loss: {mean_train_loss:.4f}, Valid loss: {mean_valid_loss:.4f}')
-        # writer.add_scalar('Loss/valid', mean_valid_loss, step)
+            # writer.add_scalar('Loss/valid', mean_valid_loss, step)
 
-        if mean_valid_loss < best_loss:
-            best_loss = mean_valid_loss
-            torch.save(model.state_dict(), config['save_path']) # Save your best model
-            print('Saving model with loss {:.3f}...'.format(best_loss))
-            early_stop_count = 0
-        else: 
-            early_stop_count += 1
+            if mean_valid_loss < best_loss:
+                best_loss = mean_valid_loss
+                torch.save(model.state_dict(), config['save_path']) # Save your best model
+                print('Saving model with loss {:.3f}...'.format(best_loss))
+                early_stop_count = 0
+            else: 
+                early_stop_count += 1
 
-        if early_stop_count >= config['early_stop']:
-            print('\nModel is not improving, so we halt the training session.')
-            return
+            if early_stop_count >= config['early_stop']:
+                print('\nModel is not improving, so we halt the training session.')
+                return
 
 #%%
 
