@@ -1,4 +1,4 @@
-#%%
+#%% environment preparation: import packages
 # Numerical Operations
 import math
 import numpy as np
@@ -18,7 +18,10 @@ from torch.utils.data import Dataset, DataLoader, random_split
 
 # For plotting learning curve
 from torch.utils.tensorboard import SummaryWriter
-#%%
+
+# for feature selection
+from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn import preprocessing
 
 def same_seed(seed): 
     '''Fixes random number generator seeds for reproducibility.'''
@@ -46,6 +49,73 @@ def predict(test_loader, model, device):
             preds.append(pred.detach().cpu())   
     preds = torch.cat(preds, dim=0).numpy()  
     return preds
+
+
+class COVID19Dataset(Dataset):
+    '''
+    x: Features.
+    y: Targets, if none, do prediction.
+    '''
+    def __init__(self, x, y=None):
+        if y is None:
+            self.y = y
+        else:
+            self.y = torch.FloatTensor(y)
+        self.x = torch.FloatTensor(x)
+
+    def __getitem__(self, idx):
+        if self.y is None:
+            return self.x[idx]
+        else:
+            return self.x[idx], self.y[idx]
+
+    def __len__(self):
+        return len(self.x)
+
+class My_Model(nn.Module):
+    def __init__(self, input_dim):
+        super(My_Model, self).__init__()
+        # TODO: modify model's structure, be aware of dimensions. 
+        self.layers = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 16),
+            nn.ReLU(),
+            nn.Linear(16, 4),
+            nn.ReLU(),
+            nn.Linear(4, 1)
+        )
+
+    def forward(self, x):
+        x = self.layers(x)
+        x = x.squeeze(1) # (B, 1) -> (B)
+        return x
+
+#%%
+
+
+
+#%%
+
+
+
+
+
+
+#%%
+
+
+
+#%%
+
+
+
+
+
+#%%
+
 
 
 #%%
