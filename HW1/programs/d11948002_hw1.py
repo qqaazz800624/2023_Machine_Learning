@@ -80,11 +80,13 @@ class My_Model(nn.Module):
         super(My_Model, self).__init__()
         # TODO: modify model's structure, be aware of dimensions. 
         self.layers = nn.Sequential(
-            nn.Linear(input_dim, 32),
+            nn.Linear(input_dim, 64),
             nn.ReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(64, 16),
             nn.ReLU(),
-            nn.Linear(16, 4),
+            nn.Linear(16, 8),
+            nn.ReLU(),
+            nn.Linear(8, 4),
             nn.ReLU(),
             nn.Linear(4, 1)
         )
@@ -107,11 +109,11 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
         # feat_idx = [0,1,2,3,4] # TODO: Select suitable feature columns.
         
         # select k best variables
-        select_k = 25
-        fs = SelectKBest(score_func = f_regression, k=select_k)
-        results = fs.fit(raw_x_train, y_train)
-        feat_idx = fs.get_support(indices=True)
-        setA = set([i for i in feat_idx])
+        k_best = 20
+        select = SelectKBest(score_func = f_regression, k=k_best)
+        fitted = select.fit(raw_x_train, y_train)
+        select_idx = select.get_support(indices=True)
+        setA = set([i for i in select_idx])
         
         # the following factors should be important, so I choose them manually
         states = [i for i in range(1, 34)]
@@ -147,7 +149,7 @@ def trainer(train_loader, valid_loader, model, config, device):
                                  )
     writer = SummaryWriter() # Writer of tensoboard.
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=5, verbose=True)
+    #scheduler = scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[6000,8000], gamma=0.8)
 
     if not os.path.isdir('./models'):
         os.mkdir('./models') # Create directory of saving models.
@@ -178,7 +180,7 @@ def trainer(train_loader, valid_loader, model, config, device):
 
         mean_train_loss = sum(loss_record)/len(loss_record)
         writer.add_scalar('Loss/train', mean_train_loss, step)
-        scheduler.step(mean_train_loss)
+        #scheduler.step()
 
         # Validation / Evaluation Part
         model.eval() # Set your model to evaluation mode.
@@ -211,14 +213,14 @@ def trainer(train_loader, valid_loader, model, config, device):
 
 device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
 config = {
-    'seed': 520,      # Your seed number, you can pick your lucky number. :)
+    'seed': 520,      # Your seed number, you can pick your lucky number. previous; 520
     'select_all': False,   # Whether to use all features.
-    'valid_ratio': 0.25,   # validation_size = train_size * valid_ratio
+    'valid_ratio': 0.3,   # validation_size = train_size * valid_ratio
     'n_epochs': 10000,     # Number of epochs.            
     'batch_size': 256, 
     'w_decay_rate': 0.005, # weight regularization
     'learning_rate': 3e-4,              
-    'early_stop': 500,    # If model has not improved for this many consecutive epochs, stop training.     
+    'early_stop': 600,    # If model has not improved for this many consecutive epochs, stop training.     
     'save_path': './models/model.ckpt'  # Your model will be saved here.
 }
 
