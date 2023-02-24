@@ -146,7 +146,6 @@ def trainer(train_loader, valid_loader, model, config, device):
                                 ,weight_decay=config['w_decay_rate']
                                  )
     writer = SummaryWriter() # Writer of tensoboard.
-    val_interval=10
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=5, verbose=True)
 
@@ -174,40 +173,39 @@ def trainer(train_loader, valid_loader, model, config, device):
             loss_record.append(loss.detach().item())
             
             # Display current epoch number and loss on tqdm progress bar.
-            # train_pbar.set_description(f'Epoch [{epoch+1}/{n_epochs}]')
-            # train_pbar.set_postfix({'loss': loss.detach().item()})
+            train_pbar.set_description(f'Epoch [{epoch+1}/{n_epochs}]')
+            train_pbar.set_postfix({'loss': loss.detach().item()})
 
         mean_train_loss = sum(loss_record)/len(loss_record)
         writer.add_scalar('Loss/train', mean_train_loss, step)
         scheduler.step(mean_train_loss)
 
         # Validation / Evaluation Part
-        if ((epoch+1)% val_interval ) == 0:
-            model.eval() # Set your model to evaluation mode.
-            loss_record = []
-            for x, y in valid_loader:
-                x, y = x.to(device), y.to(device)
-                with torch.no_grad():
-                    pred = model(x)
-                    loss = criterion(pred, y)
+        model.eval() # Set your model to evaluation mode.
+        loss_record = []
+        for x, y in valid_loader:
+            x, y = x.to(device), y.to(device)
+            with torch.no_grad():
+                pred = model(x)
+                loss = criterion(pred, y)
 
-                loss_record.append(loss.item())
+            loss_record.append(loss.item())
             
-            mean_valid_loss = sum(loss_record)/len(loss_record)
-            print(f'Epoch [{epoch+1}/{n_epochs}]: Train loss: {mean_train_loss:.4f}, Valid loss: {mean_valid_loss:.4f}')
-            # writer.add_scalar('Loss/valid', mean_valid_loss, step)
+        mean_valid_loss = sum(loss_record)/len(loss_record)
+        print(f'Epoch [{epoch+1}/{n_epochs}]: Train loss: {mean_train_loss:.4f}, Valid loss: {mean_valid_loss:.4f}')
+        # writer.add_scalar('Loss/valid', mean_valid_loss, step)
 
-            if mean_valid_loss < best_loss:
-                best_loss = mean_valid_loss
-                torch.save(model.state_dict(), config['save_path']) # Save your best model
-                print('Saving model with loss {:.3f}...'.format(best_loss))
-                early_stop_count = 0
-            else: 
-                early_stop_count += 1
+        if mean_valid_loss < best_loss:
+            best_loss = mean_valid_loss
+            torch.save(model.state_dict(), config['save_path']) # Save your best model
+            print('Saving model with loss {:.3f}...'.format(best_loss))
+            early_stop_count = 0
+        else: 
+            early_stop_count += 1
 
-            if early_stop_count >= config['early_stop']:
-                print('\nModel is not improving, so we halt the training session.')
-                return
+        if early_stop_count >= config['early_stop']:
+            print('\nModel is not improving, so we halt the training session.')
+            return
 
 #%%
 
@@ -273,10 +271,5 @@ model = My_Model(input_dim=x_train.shape[1]).to(device)
 model.load_state_dict(torch.load(config['save_path']))
 preds = predict(test_loader, model, device) 
 save_pred(preds, 'd11948002_hw1.csv')      
-
-#%%
-
-100%10
-
 
 #%%
