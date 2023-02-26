@@ -22,9 +22,16 @@ from torch.utils.tensorboard import SummaryWriter
 # for feature selection
 from sklearn.feature_selection import SelectKBest, f_regression, chi2
 from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 
 from IPython.display import FileLink
 
+# for xgboost and visualization
+import xgboost as xgb
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+#%%
 
 def same_seed(seed): 
     '''Fixes random number generator seeds for reproducibility.'''
@@ -109,7 +116,7 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
         # feat_idx = [0,1,2,3,4] # TODO: Select suitable feature columns.
         
         # select k best variables
-        k_best = 20
+        k_best = 10
         select = SelectKBest(score_func = f_regression, k=k_best)
         fitted = select.fit(raw_x_train, y_train)
         select_idx = select.get_support(indices=True)
@@ -117,11 +124,12 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
         
         # the following factors should be important, so I choose them manually
         states = [i for i in range(1, 34)]
-        covidlike = [35, 36, 53, 54, 71, 72] # covid-like illness
+        covidlike = [35, 53, 71] # covid-like illness, keep one of them should be enough
         positives = [52, 70] #tested positive before
-        behaviors = [i for i in range(37,46)]+[i for i in range(55,69)] + [i for i in range(73,82)]# behaviors: wearing mask or shop indoors
-        hunch = [49, 50, 51, 85, 86, 87]
-        manual = states + covidlike + positives + behaviors + hunch
+        # behaviors: wearing mask or shop indoors
+        behaviors = [35,39,44,45,46,49,50,51]+ [53,57,62,63,64,67,68,69] + [71,75,80,81,82,85,86,87]
+        
+        manual = states + covidlike + positives + behaviors 
         setB = set(manual)
 
         # choose union
@@ -215,12 +223,12 @@ device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
 config = {
     'seed': 520,      # Your seed number, you can pick your lucky number. previous; 520
     'select_all': False,   # Whether to use all features.
-    'valid_ratio': 0.3,   # validation_size = train_size * valid_ratio
+    'valid_ratio': 0.35,   # validation_size = train_size * valid_ratio
     'n_epochs': 10000,     # Number of epochs.            
     'batch_size': 256, 
-    'w_decay_rate': 0.005, # weight regularization
+    'w_decay_rate': 0.008, # weight regularization
     'learning_rate': 3e-4,              
-    'early_stop': 600,    # If model has not improved for this many consecutive epochs, stop training.     
+    'early_stop': 1000,    # If model has not improved for this many consecutive epochs, stop training.     
     'save_path': './models/model.ckpt'  # Your model will be saved here.
 }
 
@@ -242,6 +250,13 @@ test_data size: {test_data.shape}""")
 # Select features
 x_train, x_valid, x_test, y_train, y_valid = select_feat(train_data, valid_data, test_data, config['select_all'])
 
+# Standardizing data
+# scaler = StandardScaler()
+# scaler.fit(x_train)
+# x_train = scaler.transform(x_train)
+# x_valid = scaler.transform(x_valid)
+# x_test = scaler.transform(x_test)
+
 # Print out the number of features.
 print(f'number of features: {x_train.shape[1]}')
 
@@ -253,6 +268,8 @@ train_dataset, valid_dataset, test_dataset = COVID19Dataset(x_train, y_train), \
 train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 valid_loader = DataLoader(valid_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
 test_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)
+
+
 
 #%% Start training process
 
