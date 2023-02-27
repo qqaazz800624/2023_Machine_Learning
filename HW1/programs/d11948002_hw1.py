@@ -89,11 +89,11 @@ class My_Model(nn.Module):
         self.layers = nn.Sequential(
             nn.Linear(input_dim, 64),
             nn.ReLU(),
-            nn.Linear(64, 16),
+            nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(16, 8),
+            nn.Linear(32, 16),
             nn.ReLU(),
-            nn.Linear(8, 4),
+            nn.Linear(16, 4),
             nn.ReLU(),
             nn.Linear(4, 1)
         )
@@ -116,25 +116,13 @@ def select_feat(train_data, valid_data, test_data, select_all=True):
         # feat_idx = [0,1,2,3,4] # TODO: Select suitable feature columns.
         
         # select k best variables
-        k_best = 10
+        k_best = 25
         select = SelectKBest(score_func = f_regression, k=k_best)
         fitted = select.fit(raw_x_train, y_train)
         select_idx = select.get_support(indices=True)
         setA = set([i for i in select_idx])
         
-        # the following factors should be important, so I choose them manually
-        states = [i for i in range(1, 34)]
-        covidlike = [35, 53, 71] # covid-like illness, keep one of them should be enough
-        positives = [52, 70] #tested positive before
-        # behaviors: wearing mask or shop indoors
-        behaviors = [35,39,44,45,46,49,50,51]+ [53,57,62,63,64,67,68,69] + [71,75,80,81,82,85,86,87]
-        
-        manual = states + covidlike + positives + behaviors 
-        setB = set(manual)
-
-        # choose union
-        setC = setB.union(setA)
-        feat_idx = list(setC)
+        feat_idx = list(setA)
         print(feat_idx)
  
     return raw_x_train[:,feat_idx], raw_x_valid[:,feat_idx], raw_x_test[:,feat_idx], y_train, y_valid
@@ -223,12 +211,12 @@ device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
 config = {
     'seed': 520,      # Your seed number, you can pick your lucky number. previous; 520
     'select_all': False,   # Whether to use all features.
-    'valid_ratio': 0.35,   # validation_size = train_size * valid_ratio
+    'valid_ratio': 0.3,   # validation_size = train_size * valid_ratio
     'n_epochs': 10000,     # Number of epochs.            
     'batch_size': 256, 
-    'w_decay_rate': 0.008, # weight regularization
-    'learning_rate': 3e-4,              
-    'early_stop': 1000,    # If model has not improved for this many consecutive epochs, stop training.     
+    'w_decay_rate': 0.03, # weight regularization
+    'learning_rate': 2e-4,              
+    'early_stop': 600,    # If model has not improved for this many consecutive epochs, stop training.     
     'save_path': './models/model.ckpt'  # Your model will be saved here.
 }
 
