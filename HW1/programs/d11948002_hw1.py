@@ -87,7 +87,11 @@ class My_Model(nn.Module):
         super(My_Model, self).__init__()
         # TODO: modify model's structure, be aware of dimensions. 
         self.layers = nn.Sequential(
-            nn.Linear(input_dim, 64),
+            nn.Linear(input_dim, 120),
+            nn.ReLU(),
+            nn.Linear(120, 80),
+            nn.ReLU(),
+            nn.Linear(80, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
@@ -211,13 +215,13 @@ def trainer(train_loader, valid_loader, model, config, device):
 
 device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
 config = {
-    'seed': 520,      # Your seed number, you can pick your lucky number. default: 520
+    'seed': 500,      # Your seed number, you can pick your lucky number. default: 520
     'select_all': False,   # Whether to use all features.
     'valid_ratio': 0.3,   # validation_size = train_size * valid_ratio
     'n_epochs': 10000,     # Number of epochs.            
     'batch_size': 64,     # batch_size, default: 64
-    'w_decay_rate': 0.003, # weight regularization, default: 0.003
-    'learning_rate': 2e-4,     #default: 2e-4         
+    'w_decay_rate': 0.01, # weight regularization, default: 0.003
+    'learning_rate': 3e-5,     #default: 2e-4         
     'early_stop': 600,    # If model has not improved for this number of epochs, stop training.     
     'save_path': './models/model.ckpt'  # Your model will be saved here.
 }
@@ -280,5 +284,6 @@ model = My_Model(input_dim=x_train.shape[1]).to(device)
 model.load_state_dict(torch.load(config['save_path']))
 preds = predict(test_loader, model, device) 
 save_pred(preds, 'd11948002_hw1.csv')      
+
 
 #%%
