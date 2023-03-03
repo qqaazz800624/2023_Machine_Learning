@@ -188,7 +188,7 @@ hidden_dim = 64           # the hidden dim
 #%%
 
 same_seeds(seed)
-device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
+device = 'cuda:0' if torch.cuda.is_available() else 'cuda:1'
 print(f'DEVICE: {device}')
 
 # preprocess data
