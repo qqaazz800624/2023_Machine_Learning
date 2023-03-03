@@ -1,11 +1,12 @@
 #%%
 import numpy as np
 import torch
+import torch.nn as nn
 import random
-
 import os
-import torch
 from tqdm import tqdm
+from torch.utils.data import Dataset, DataLoader
+import gc
 
 #%%
 
@@ -112,86 +113,199 @@ def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8
 
 #%%
 
+class LibriDataset(Dataset):
+    def __init__(self, X, y=None):
+        self.data = X
+        if y is not None:
+            self.label = torch.LongTensor(y)
+        else:
+            self.label = None
 
+    def __getitem__(self, idx):
+        if self.label is not None:
+            return self.data[idx], self.label[idx]
+        else:
+            return self.data[idx]
 
-
-#%%
-
-
-
-
-
-#%%
-
-
-
-
-#%%
-
-
-
-
-
-#%%
-
-
+    def __len__(self):
+        return len(self.data)
 
 
 #%%
 
+class BasicBlock(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(BasicBlock, self).__init__()
+
+        # TODO: apply batch normalization and dropout for strong baseline.
+        # Reference: https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm1d.html (batch normalization)
+        #       https://pytorch.org/docs/stable/generated/torch.nn.Dropout.html (dropout)
+        self.block = nn.Sequential(
+            nn.Linear(input_dim, output_dim),
+            nn.ReLU(),
+        )
+
+    def forward(self, x):
+        x = self.block(x)
+        return x
 
 
+class Classifier(nn.Module):
+    def __init__(self, input_dim, output_dim=41, hidden_layers=1, hidden_dim=256):
+        super(Classifier, self).__init__()
+
+        self.fc = nn.Sequential(
+            BasicBlock(input_dim, hidden_dim),
+            *[BasicBlock(hidden_dim, hidden_dim) for _ in range(hidden_layers)],
+            nn.Linear(hidden_dim, output_dim)
+        )
+
+    def forward(self, x):
+        x = self.fc(x)
+        return x
+
+
+#%% Hyperparameters
+
+# data prarameters
+# TODO: change the value of "concat_nframes" for medium baseline
+concat_nframes = 3   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+train_ratio = 0.75   # the ratio of data used for training, the rest will be used for validation
+
+# training parameters
+seed = 1213          # random seed
+batch_size = 512        # batch size
+num_epoch = 10         # the number of training epoch
+learning_rate = 1e-4      # learning rate
+model_path = './model.ckpt'  # the path where the checkpoint will be saved
+
+# model parameters
+# TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
+input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
+hidden_layers = 2          # the number of hidden layers
+hidden_dim = 64           # the hidden dim
+
+#%%
+
+same_seeds(seed)
+device = 'cuda:1' if torch.cuda.is_available() else 'cuda:2'
+print(f'DEVICE: {device}')
+
+# preprocess data
+train_X, train_y = preprocess_data(split='train', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio)
+val_X, val_y = preprocess_data(split='val', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio)
+
+# get dataset
+train_set = LibriDataset(train_X, train_y)
+val_set = LibriDataset(val_X, val_y)
+
+# remove raw feature to save memory
+del train_X, train_y, val_X, val_y
+gc.collect()
+
+# get dataloader
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
+
+#%%
+
+# create model, define a loss function, and optimizer
+model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+criterion = nn.CrossEntropyLoss() 
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+best_acc = 0.0
+for epoch in range(num_epoch):
+    train_acc = 0.0
+    train_loss = 0.0
+    val_acc = 0.0
+    val_loss = 0.0
+    
+    # training
+    model.train() # set the model to training mode
+    for i, batch in enumerate(tqdm(train_loader)):
+        features, labels = batch
+        features = features.to(device)
+        labels = labels.to(device)
+        
+        optimizer.zero_grad() 
+        outputs = model(features) 
+        
+        loss = criterion(outputs, labels)
+        loss.backward() 
+        optimizer.step() 
+        
+        _, train_pred = torch.max(outputs, 1) # get the index of the class with the highest probability
+        train_acc += (train_pred.detach() == labels.detach()).sum().item()
+        train_loss += loss.item()
+    
+    # validation
+    model.eval() # set the model to evaluation mode
+    with torch.no_grad():
+        for i, batch in enumerate(tqdm(val_loader)):
+            features, labels = batch
+            features = features.to(device)
+            labels = labels.to(device)
+            outputs = model(features)
+            
+            loss = criterion(outputs, labels) 
+            
+            _, val_pred = torch.max(outputs, 1) 
+            val_acc += (val_pred.cpu() == labels.cpu()).sum().item() # get the index of the class with the highest probability
+            val_loss += loss.item()
+
+    print(f'[{epoch+1:03d}/{num_epoch:03d}] Train Acc: {train_acc/len(train_set):3.5f} Loss: {train_loss/len(train_loader):3.5f} | Val Acc: {val_acc/len(val_set):3.5f} loss: {val_loss/len(val_loader):3.5f}')
+
+    # if the model improves, save a checkpoint at this epoch
+    if val_acc > best_acc:
+        best_acc = val_acc
+        torch.save(model.state_dict(), model_path)
+        print(f'saving model with acc {best_acc/len(val_set):.5f}')
+
+#%%
+
+del train_set, val_set
+del train_loader, val_loader
+gc.collect()
+
+#%%
+
+# load data
+test_X = preprocess_data(split='test', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes)
+test_set = LibriDataset(test_X, None)
+test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
 
 #%%
 
-
-
-
-#%%
-
-
-
-
+# load model
+model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+model.load_state_dict(torch.load(model_path))
 
 
 #%%
 
+pred = np.array([], dtype=np.int32)
 
+model.eval()
+with torch.no_grad():
+    for i, batch in enumerate(tqdm(test_loader)):
+        features = batch
+        features = features.to(device)
 
+        outputs = model(features)
 
-#%%
-
-
-
-
-
-#%%
-
-
-
-
-#%%
-
-
-
-
+        _, test_pred = torch.max(outputs, 1) # get the index of the class with the highest probability
+        pred = np.concatenate((pred, test_pred.cpu().numpy()), axis=0)
 
 
 #%%
 
-
-
-
-#%%
-
-
-
+with open('d11948002_hw2.csv', 'w') as f:
+    f.write('Id,Class\n')
+    for i, y in enumerate(pred):
+        f.write('{},{}\n'.format(i, y))
 
 
 #%%
 
-
-
-
-#%%
