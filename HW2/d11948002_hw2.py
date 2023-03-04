@@ -8,7 +8,6 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 import gc
 
-#%%
 
 def same_seeds(seed):
     random.seed(seed) 
@@ -19,8 +18,6 @@ def same_seeds(seed):
         torch.cuda.manual_seed_all(seed) 
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-
-#%%
 
 def load_feat(path):
     feat = torch.load(path)
@@ -111,7 +108,6 @@ def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8
     else:
       return X
 
-#%%
 
 class LibriDataset(Dataset):
     def __init__(self, X, y=None):
@@ -132,7 +128,7 @@ class LibriDataset(Dataset):
 
 
 #%%
-
+'''
 class BasicBlock(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(BasicBlock, self).__init__()
@@ -165,15 +161,85 @@ class Classifier(nn.Module):
         return x
 
 
+
+class RNN(nn.Module):
+    def __init__(self, input_size, hidden_dim=64, n_layers=1):
+        super(RNN, self).__init__()
+
+        # Defining some parameters
+        self.hidden_dim = hidden_dim
+        self.n_layers = n_layers
+
+        #Defining the layers
+        self.rnn = nn.RNN(input_size, hidden_dim, n_layers, batch_first=False)   
+        self.fc = nn.Linear(hidden_dim, 41)
+    
+    def init_hidden(self, batch_size):
+        hidden = torch.zeros(self.n_layers, batch_size, self.hidden_dim).to(device)
+        return hidden
+
+    def forward(self, x):
+        
+        batch_size = x.size(0)
+
+        #Initializing hidden state 
+        hidden = self.init_hidden(batch_size)
+
+        # Passing in the input and hidden state into the model and obtaining outputs
+        out, hidden = self.rnn(x, hidden)
+        
+        # Reshaping the outputs such that it can be fit into the fully connected layer
+        out = out.contiguous().view(-1, self.hidden_dim)
+        out = self.fc(out)
+        
+        return out, hidden
+''' 
+
+
+class LSTM(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=1):
+        super(LSTM, self).__init__()
+
+        self.lstm = nn.LSTM(input_size=input_size,
+                           hidden_size=hidden_size,        
+                           num_layers=num_layers,          
+                           batch_first=True,     #(batch, time_step, input_size)
+                           dropout=0.1,
+                           bidirectional = True
+                           )
+        self.out = nn.Sequential(
+            nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
+            nn.ReLU(),
+            nn.Linear(hidden_size, 41), # 41 is class of output
+        )
+
+    def forward(self, inputs):
+        r_out, h_n = self.lstm(inputs, None)
+        out = self.out(r_out)
+        return out
+
+#%%
+
+# rnn = nn.LSTM(10, 20, 2)
+# input = torch.randn(5, 3, 10)
+# h0 = torch.randn(2, 3, 20)
+# c0 = torch.randn(2, 3, 20)
+# output, (hn, cn) = rnn(input, (h0, c0))
+
+
+# print(output.shape)
+# print(hn.shape)
+# print(cn.shape)
+
 #%% Hyperparameters
 
 # data prarameters
 # TODO: change the value of "concat_nframes" for medium baseline
-concat_nframes = 3   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
-train_ratio = 0.75   # the ratio of data used for training, the rest will be used for validation
+concat_nframes = 39   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
+train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
-seed = 1213          # random seed
+seed = 5          # random seed
 batch_size = 512        # batch size
 num_epoch = 10         # the number of training epoch
 learning_rate = 1e-4      # learning rate
@@ -181,9 +247,14 @@ model_path = './model.ckpt'  # the path where the checkpoint will be saved
 
 # model parameters
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
-input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
-hidden_layers = 2          # the number of hidden layers
-hidden_dim = 64           # the hidden dim
+# input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
+# hidden_layers = 2          # the number of hidden layers
+# hidden_dim = 64           # the hidden dim
+
+input_size = 39 * concat_nframes
+hidden_size = 128
+num_layers = 3
+
 
 #%%
 
@@ -210,9 +281,13 @@ val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
 #%%
 
 # create model, define a loss function, and optimizer
-model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+#model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
+#model = RNN(input_size=input_size, hidden_dim=hidden_size, n_layers=num_layers).to(device)
 criterion = nn.CrossEntropyLoss() 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+print(model)
+#%%
 
 best_acc = 0.0
 for epoch in range(num_epoch):
@@ -279,7 +354,9 @@ test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 #%%
 
 # load model
-model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+#model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
+#model = RNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
 model.load_state_dict(torch.load(model_path))
 
 
