@@ -3,26 +3,24 @@ Question 1:
         accuracy
             training: 0.71290
             validation: 0.74951
-            test: 0.71365
     B. wider and shallower model:  (e.g. hidden_layers=2, hidden_dim=1750)
         accuracy
             training: 0.71892
             validation: 0.74815
-            test: 0.71013
 
 Question 2:
     A. dropout(0.25)
         accuracy
-            training: 
-            validation: 
-            test: 
+            training: 0.73469
+            validation: 0.78421
+            
     B. dropout(0.50)
         accuracy
-            training: 
-            validation: 
-            test:
+            training: 0.64284
+            validation: 0.71246
+            
     C. dropout(0.75)
         accuracy
-            training: 
-            validation: 
-            test:
+            training: 0.52871
+            validation: 0.61217
+            

@@ -9,6 +9,8 @@ from torch.utils.data import Dataset, DataLoader
 import gc
 
 
+#%%
+
 def same_seeds(seed):
     random.seed(seed) 
     np.random.seed(seed)  
@@ -35,7 +37,7 @@ def shift(x, n):
 
     return torch.cat((left, right), dim=0)
 
-def concat_feat(x, concat_n):
+def concat_feat(x, concat_n, model_type='LSTM'):
     assert concat_n % 2 == 1 # n must be odd
     if concat_n < 2:
         return x
@@ -48,10 +50,13 @@ def concat_feat(x, concat_n):
         x[mid - r_idx, :] = shift(x[mid - r_idx], -r_idx)
 
     #return x.permute(1, 0, 2).view(seq_len, concat_n * feature_dim)
-    # --- Modify Here ---
-    return x.permute(1,0,2)
+    # --- Modify Here to train LSTM ---
+    if model_type == 'LSTM':
+        return x.permute(1,0,2)
+    else:
+        return x.permute(1, 0, 2).view(seq_len, concat_n * feature_dim)
 
-def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8):
+def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8, model_type='LSTM'):
     class_num = 41 # NOTE: pre-computed, should not need change
 
     if split == 'train' or split == 'val':
@@ -81,8 +86,11 @@ def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8
 
     max_len = 3000000
     #X = torch.empty(max_len, 39 * concat_nframes)
-    # --- Modify Here ---
-    X = torch.empty(max_len, concat_nframes, 39)
+    # --- Modify Here to train LSTM ---
+    if model_type == 'LSTM':
+        X = torch.empty(max_len, concat_nframes, 39)
+    else:
+        X = torch.empty(max_len, 39 * concat_nframes)
 
     if mode == 'train':
         y = torch.empty(max_len, dtype=torch.long)
@@ -91,7 +99,7 @@ def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8
     for i, fname in tqdm(enumerate(usage_list)):
         feat = load_feat(os.path.join(feat_dir, mode, f'{fname}.pt'))
         cur_len = len(feat)
-        feat = concat_feat(feat, concat_nframes)
+        feat = concat_feat(feat, concat_nframes, model_type=model_type)
         if mode == 'train':
           label = torch.LongTensor(label_dict[fname])
 
@@ -141,12 +149,19 @@ class BasicBlock(nn.Module):
         # TODO: apply batch normalization and dropout for strong baseline.
         # Reference: https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm1d.html (batch normalization)
         #       https://pytorch.org/docs/stable/generated/torch.nn.Dropout.html (dropout)
-        self.block = nn.Sequential(
-            nn.Linear(input_dim, output_dim),
-            nn.ReLU(),
-            nn.BatchNorm1d(output_dim),
-            nn.Dropout(0.25),
-        )
+        # self.block = nn.Sequential(
+        #     nn.Linear(input_dim, output_dim),
+        #     nn.ReLU(),
+        #     nn.BatchNorm1d(output_dim),
+        #     nn.Dropout(0.75),
+        # )
+        self.block = nn.LSTM(         
+                    input_size=input_size,
+                    hidden_size=hidden_size,        
+                    num_layers=num_layers,          
+                    batch_first=True,     #(batch, time_step, input_size)
+                    dropout=0.1
+                    )
 
     def forward(self, x):
         x = self.block(x)
@@ -158,10 +173,10 @@ class Classifier(nn.Module):
         super(Classifier, self).__init__()
 
         self.fc = nn.Sequential(
-            BasicBlock(input_dim, hidden_dim),
-            *[BasicBlock(hidden_dim, hidden_dim) for _ in range(hidden_layers)],
-            nn.Linear(hidden_dim, output_dim)
-        )
+                    BasicBlock(input_dim, hidden_dim),
+                    *[BasicBlock(hidden_dim, hidden_dim) for _ in range(hidden_layers)],
+                    nn.Linear(hidden_dim, output_dim)
+                    )
 
     def forward(self, x):
         x = self.fc(x)
@@ -169,35 +184,40 @@ class Classifier(nn.Module):
 
 
 
-#%%
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=1):
         super(LSTM, self).__init__()
 
-        self.rnn = nn.LSTM(         
-            input_size=input_size,
-            hidden_size=hidden_size,        
-            num_layers=num_layers,          
-            batch_first=True,     #(batch, time_step, input_size)
-            dropout=0.1,
-            bidirectional = True
-        )
+        self.lstm = nn.LSTM(         
+                    input_size=input_size,
+                    hidden_size=hidden_size,        
+                    num_layers=num_layers,          
+                    batch_first=True,     #(batch, time_step, input_size)
+                    dropout=0.1,
+                    bidirectional = True
+                    )
 
         self.out = nn.Sequential(
-            nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
-            nn.ReLU(),
-            nn.Linear(hidden_size, 41), # 41 is class of output
-        )
+                    nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size),
+                    nn.Dropout(0.1),
+                    nn.Linear(hidden_size, hidden_size//2), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//2),
+                    nn.Dropout(0.1),
+                    nn.Linear(hidden_size//2, 41)  # 41 is class of output
+                )
 
     def forward(self, x):
-        # x shape (batch, time_step, input_size)
-        # r_out shape (batch, time_step, output_size)
-        # h_n shape (n_layers, batch, hidden_size)
-        # h_c shape (n_layers, batch, hidden_size)
-        r_out, h_n = self.rnn(x, None)
-        #out = self.out(r_out)
-        out = self.out(r_out[:, -1, :])
+        # x.shape (batch, time_step, input_size)
+        # output.shape (batch, time_step, output_size)
+        # hidden_state.shape (n_layers, batch, hidden_size)
+        # cell_state.shape (n_layers, batch, hidden_size)
+        output, (hidden_state, cell_state) = self.lstm(x, None)
+        out = self.out(output[:, -1, :])
         return out
+
 
 #%% Hyperparameters Configs
 
@@ -208,32 +228,36 @@ train_ratio = 0.8   # the ratio of data used for training, the rest will be used
 
 # training parameters
 seed = 5          # random seed
-batch_size = 512        # batch size
-num_epoch = 15         # the number of training epoch
-learning_rate = 0.005     # learning rate
+batch_size = 256        # batch size
+num_epoch = 30         # the number of training epoch
+learning_rate = 3e-4     # learning rate
 #weight_decay = 0.005
 model_path = './model.ckpt'  # the path where the checkpoint will be saved
 
-# model parameters
+# model parameters for Linear Classifer. Used for gradescope.
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
 hidden_layers = 6          # the number of hidden layers
-hidden_dim = 1024           # the hidden dim
+hidden_dim = 128           # the hidden dim
 
+# model parameters for LSTM
 input_size = 39 
 hidden_size = 128
-num_layers = 3
+num_layers = 5
+
+# decide which type of model to use, default: LSTM
+model_type = 'LSTM' 
 
 
 #%%
 
 same_seeds(seed)
-device = 'cuda:1' if torch.cuda.is_available() else 'cuda:3'
+device = 'cuda:3' if torch.cuda.is_available() else 'cuda:1'
 print(f'DEVICE: {device}')
 
 # preprocess data
-train_X, train_y = preprocess_data(split='train', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio)
-val_X, val_y = preprocess_data(split='val', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio)
+train_X, train_y = preprocess_data(split='train', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio, model_type=model_type)
+val_X, val_y = preprocess_data(split='val', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio, model_type=model_type)
 
 # get dataset
 train_set = LibriDataset(train_X, train_y)
@@ -251,7 +275,11 @@ val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
 
 # create model, define a loss function, and optimizer
 #model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
-model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
+if model_type == 'LSTM':
+    model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
+else:
+    model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+
 criterion = nn.CrossEntropyLoss() 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 print(model)
@@ -313,7 +341,7 @@ gc.collect()
 #%%
 
 # load data
-test_X = preprocess_data(split='test', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes)
+test_X = preprocess_data(split='test', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, model_type=model_type)
 test_set = LibriDataset(test_X, None)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
@@ -322,7 +350,12 @@ test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
 # load model
 #model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
-model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
+
+if model_type == 'LSTM':
+    model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
+else:
+    model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
+
 model.load_state_dict(torch.load(model_path))
 
 
