@@ -149,19 +149,19 @@ class BasicBlock(nn.Module):
         # TODO: apply batch normalization and dropout for strong baseline.
         # Reference: https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm1d.html (batch normalization)
         #       https://pytorch.org/docs/stable/generated/torch.nn.Dropout.html (dropout)
-        # self.block = nn.Sequential(
-        #     nn.Linear(input_dim, output_dim),
-        #     nn.ReLU(),
-        #     nn.BatchNorm1d(output_dim),
-        #     nn.Dropout(0.75),
-        # )
-        self.block = nn.LSTM(         
-                    input_size=input_size,
-                    hidden_size=hidden_size,        
-                    num_layers=num_layers,          
-                    batch_first=True,     #(batch, time_step, input_size)
-                    dropout=0.1
-                    )
+        self.block = nn.Sequential(
+            nn.Linear(input_dim, output_dim),
+            nn.ReLU(),
+            nn.BatchNorm1d(output_dim),
+            nn.Dropout(0.75),
+        )
+        # self.block = nn.LSTM(         
+        #             input_size=input_size,
+        #             hidden_size=hidden_size,        
+        #             num_layers=num_layers,          
+        #             batch_first=True,     #(batch, time_step, input_size)
+        #             dropout=0.1
+        #             )
 
     def forward(self, x):
         x = self.block(x)
@@ -193,7 +193,7 @@ class LSTM(nn.Module):
                     hidden_size=hidden_size,        
                     num_layers=num_layers,          
                     batch_first=True,     #(batch, time_step, input_size)
-                    dropout=0.1,
+                    dropout=0.25,
                     bidirectional = True
                     )
 
@@ -201,12 +201,20 @@ class LSTM(nn.Module):
                     nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
                     nn.ReLU(),
                     nn.BatchNorm1d(hidden_size),
-                    nn.Dropout(0.1),
+                    nn.Dropout(0.25),
                     nn.Linear(hidden_size, hidden_size//2), 
                     nn.ReLU(),
                     nn.BatchNorm1d(hidden_size//2),
-                    nn.Dropout(0.1),
-                    nn.Linear(hidden_size//2, 41)  # 41 is class of output
+                    nn.Dropout(0.25),
+                    nn.Linear(hidden_size//2, hidden_size//4), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//4),
+                    nn.Dropout(0.25),
+                    nn.Linear(hidden_size//4, hidden_size//8), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//8),
+                    nn.Dropout(0.25),
+                    nn.Linear(hidden_size//8, 41)  # 41 is class of output
                 )
 
     def forward(self, x):
@@ -224,14 +232,14 @@ class LSTM(nn.Module):
 # data prarameters
 # TODO: change the value of "concat_nframes" for medium baseline
 concat_nframes = 39   # the number of frames to concat with, n must be odd (total 2k+1 = n frames)
-train_ratio = 0.8   # the ratio of data used for training, the rest will be used for validation
+train_ratio = 0.7   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
-seed = 5          # random seed
+seed = 50          # random seed
 batch_size = 256        # batch size
-num_epoch = 30         # the number of training epoch
+num_epoch = 10         # the number of training epoch
 learning_rate = 3e-4     # learning rate
-#weight_decay = 0.005
+weight_decay = 0.03
 model_path = './model.ckpt'  # the path where the checkpoint will be saved
 
 # model parameters for Linear Classifer. Used for gradescope.
@@ -242,19 +250,17 @@ hidden_dim = 128           # the hidden dim
 
 # model parameters for LSTM
 input_size = 39 
-hidden_size = 128
-num_layers = 5
+hidden_size = 1750
+num_layers = 3
 
 # decide which type of model to use, default: LSTM
 model_type = 'LSTM' 
-
-
-#%%
 
 same_seeds(seed)
 device = 'cuda:3' if torch.cuda.is_available() else 'cuda:1'
 print(f'DEVICE: {device}')
 
+#%%
 # preprocess data
 train_X, train_y = preprocess_data(split='train', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio, model_type=model_type)
 val_X, val_y = preprocess_data(split='val', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio, model_type=model_type)
@@ -281,7 +287,7 @@ else:
     model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
 
 criterion = nn.CrossEntropyLoss() 
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 print(model)
 #%%
 
@@ -345,9 +351,6 @@ test_X = preprocess_data(split='test', feat_dir='./libriphone/feat', phone_path=
 test_set = LibriDataset(test_X, None)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
-
-#%%
-
 # load model
 #model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
 
@@ -374,8 +377,6 @@ with torch.no_grad():
         _, test_pred = torch.max(outputs, 1) # get the index of the class with the highest probability
         pred = np.concatenate((pred, test_pred.cpu().numpy()), axis=0)
 
-
-#%%
 
 with open('d11948002_hw2.csv', 'w') as f:
     f.write('Id,Class\n')
