@@ -193,7 +193,7 @@ class LSTM(nn.Module):
                     hidden_size=hidden_size,        
                     num_layers=num_layers,          
                     batch_first=True,     #(batch, time_step, input_size)
-                    dropout=0.25,
+                    dropout=0.3,
                     bidirectional = True
                     )
 
@@ -201,20 +201,20 @@ class LSTM(nn.Module):
                     nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
                     nn.ReLU(),
                     nn.BatchNorm1d(hidden_size),
-                    nn.Dropout(0.25),
+                    nn.Dropout(0.3),
                     nn.Linear(hidden_size, hidden_size//2), 
                     nn.ReLU(),
                     nn.BatchNorm1d(hidden_size//2),
-                    nn.Dropout(0.25),
+                    nn.Dropout(0.3),
                     nn.Linear(hidden_size//2, hidden_size//4), 
                     nn.ReLU(),
                     nn.BatchNorm1d(hidden_size//4),
-                    nn.Dropout(0.25),
+                    nn.Dropout(0.3),
                     nn.Linear(hidden_size//4, hidden_size//8), 
                     nn.ReLU(),
                     nn.BatchNorm1d(hidden_size//8),
-                    nn.Dropout(0.25),
-                    nn.Linear(hidden_size//8, 41)  # 41 is class of output
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//8, 41)   # 41 is class of output
                 )
 
     def forward(self, x):
@@ -236,7 +236,7 @@ train_ratio = 0.7   # the ratio of data used for training, the rest will be used
 
 # training parameters
 seed = 50          # random seed
-batch_size = 256        # batch size
+batch_size = 512        # batch size
 num_epoch = 10         # the number of training epoch
 learning_rate = 3e-4     # learning rate
 weight_decay = 0.03
@@ -250,14 +250,14 @@ hidden_dim = 128           # the hidden dim
 
 # model parameters for LSTM
 input_size = 39 
-hidden_size = 1750
-num_layers = 3
+hidden_size = 512
+num_layers = 6
 
 # decide which type of model to use, default: LSTM
 model_type = 'LSTM' 
 
 same_seeds(seed)
-device = 'cuda:3' if torch.cuda.is_available() else 'cuda:1'
+device = 'cuda:1' if torch.cuda.is_available() else 'cuda:0'
 print(f'DEVICE: {device}')
 
 #%%
