@@ -150,9 +150,9 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.0003, weight_decay=1e-5)
 
 # Construct train and valid datasets.
 # The argument "loader" tells how torchvision reads the data.
-train_set = FoodDataset('/home/u/qqaazz800624/2023_Machine_Learning/HW3/hw3_dataset/train', tfm=train_tfm)
+train_set = FoodDataset('/neodata/ML/hw3_dataset/train', tfm=train_tfm)
 train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
-valid_set = FoodDataset('/home/u/qqaazz800624/2023_Machine_Learning/HW3/hw3_dataset/valid', tfm=test_tfm)
+valid_set = FoodDataset('/neodata/ML/hw3_dataset/valid', tfm=test_tfm)
 valid_loader = DataLoader(valid_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
 
 #%%
@@ -275,7 +275,7 @@ for epoch in range(n_epochs):
 
 # Construct test datasets.
 # The argument "loader" tells how torchvision reads the data.
-test_set = FoodDataset("/home/u/qqaazz800624/2023_Machine_Learning/HW3/hw3_dataset/test", tfm=test_tfm)
+test_set = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
 
