@@ -41,7 +41,10 @@ train_tfm = transforms.Compose([
     # Resize the image into a fixed shape (height = width = 128)
     transforms.Resize((128, 128)),
     # You may add some transforms here.
-    
+    transforms.RandomHorizontalFlip(p=1), #將所有圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
+    transforms.RandomAffine(degrees=(-20, 20),
+                            translate=(0.1, 0.3),
+                            scale=(0.5, 0.75)),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
 ])
@@ -90,7 +93,7 @@ class Classifier(nn.Module):
             nn.MaxPool2d(2, 2, 0),      # [64, 64, 64]
 
             nn.Conv2d(64, 128, 3, 1, 1), # [128, 64, 64]
-            nn.BatchNorm2d(128),
+            nn.BatchNorm2d(128), 
             nn.ReLU(),
             nn.MaxPool2d(2, 2, 0),      # [128, 32, 32]
 
@@ -126,7 +129,7 @@ class Classifier(nn.Module):
 #%%
 
 # "cuda" only when GPUs are available.
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
 
 # Initialize a model, and put it on the device specified.
 model = Classifier().to(device)
@@ -135,7 +138,7 @@ model = Classifier().to(device)
 batch_size = 64
 
 # The number of training epochs.
-n_epochs = 8
+n_epochs = 50
 
 # If no improvement in 'patience' epochs, early stop.
 patience = 300
@@ -144,7 +147,7 @@ patience = 300
 criterion = nn.CrossEntropyLoss()
 
 # Initialize optimizer, you may fine-tune some hyperparameters such as learning rate on your own.
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0003, weight_decay=1e-5)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
 #%%
 
