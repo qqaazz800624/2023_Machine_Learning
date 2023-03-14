@@ -251,7 +251,7 @@ hidden_dim = 128           # the hidden dim
 # model parameters for LSTM
 input_size = 39 
 hidden_size = 512
-num_layers = 6
+num_layers = 10
 
 # decide which type of model to use, default: LSTM
 model_type = 'LSTM' 
