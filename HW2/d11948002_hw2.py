@@ -251,13 +251,13 @@ hidden_dim = 128           # the hidden dim
 # model parameters for LSTM
 input_size = 39 
 hidden_size = 512
-num_layers = 10
+num_layers = 12
 
 # decide which type of model to use, default: LSTM
 model_type = 'LSTM' 
 
 same_seeds(seed)
-device = 'cuda:1' if torch.cuda.is_available() else 'cuda:0'
+device = 'cuda:1' if torch.cuda.is_available() else 'cuda:3'
 print(f'DEVICE: {device}')
 
 #%%
