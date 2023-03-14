@@ -141,13 +141,15 @@ batch_size = 64
 n_epochs = 50
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 300
+patience = 20
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
 
 # Initialize optimizer, you may fine-tune some hyperparameters such as learning rate on your own.
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+learning_rate = 3e-4
+weight_decay = 0.001
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 #%%
 
