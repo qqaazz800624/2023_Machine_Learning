@@ -8,6 +8,7 @@ import torch
 import os
 import torch.nn as nn
 import torchvision.transforms as transforms
+from torchvision import models
 from PIL import Image
 # "ConcatDataset" and "Subset" are possibly useful when doing semi-supervised learning.
 from torch.utils.data import ConcatDataset, DataLoader, Subset, Dataset
@@ -16,7 +17,6 @@ from torchvision.datasets import DatasetFolder, VisionDataset
 from tqdm.auto import tqdm
 import random
 
-#%%
 
 myseed = 6666  # set a random seed for reproducibility
 torch.backends.cudnn.deterministic = True
@@ -45,11 +45,15 @@ train_tfm = transforms.Compose([
     transforms.RandomAffine(degrees=(-20, 20),
                             translate=(0.1, 0.3),
                             scale=(0.5, 0.75)),
+    transforms.ColorJitter(brightness=0.1,
+                           contrast=0.2,
+                           saturation=0,
+                           hue=0
+                            ),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
 ])
 
-#%%
 
 class FoodDataset(Dataset):
 
@@ -77,8 +81,6 @@ class FoodDataset(Dataset):
             
         return im,label
 
-
-#%%
 
 class Classifier(nn.Module):
     def __init__(self):
@@ -124,6 +126,31 @@ class Classifier(nn.Module):
         out = self.cnn(x)
         out = out.view(out.size()[0], -1)
         return self.fc(out)
+    
+#%% load pretrained model architecture
+
+# "cuda" only when GPUs are available.
+device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
+
+class MyModel(nn.Module):
+    def __init__(self):
+        super(MyModel, self).__init__()
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        # torch.nn.MaxPool2d(kernel_size, stride, padding)
+        # input 維度 [3, 128, 128]
+        self.cnn = models.resnet50(weights=False).to(device)
+        self.fc = nn.Sequential(
+                        nn.Linear(1000, 1024),
+                        nn.ReLU(),
+                        nn.Linear(1024, 512),
+                        nn.ReLU(),
+                        nn.Linear(512, 11)
+                        ).to(device)
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.view(out.size()[0], -1)
+        return self.fc(out)
 
 
 #%%
@@ -132,16 +159,17 @@ class Classifier(nn.Module):
 device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
 
 # Initialize a model, and put it on the device specified.
-model = Classifier().to(device)
+#model = Classifier().to(device)
+model = MyModel().to(device)
 
 # The number of batch size.
 batch_size = 64
 
 # The number of training epochs.
-n_epochs = 50
+n_epochs = 100
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 20
+patience = 30
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
@@ -150,7 +178,7 @@ criterion = nn.CrossEntropyLoss()
 learning_rate = 3e-4
 weight_decay = 0.001
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 25, 40, 55, 70, 85], gamma=0.5)
 #%%
 
 # Construct train and valid datasets.
@@ -211,7 +239,7 @@ for epoch in range(n_epochs):
         
     train_loss = sum(train_loss) / len(train_loss)
     train_acc = sum(train_accs) / len(train_accs)
-
+    scheduler.step()
     # Print the information.
     print(f"[ Train | {epoch + 1:03d}/{n_epochs:03d} ] loss = {train_loss:.5f}, acc = {train_acc:.5f}")
 
@@ -286,7 +314,8 @@ test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_wor
 
 #%%
 
-model_best = Classifier().to(device)
+#model_best = Classifier().to(device)
+model_best = MyModel().to(device)
 model_best.load_state_dict(torch.load(f"{_exp_name}_best.ckpt"))
 model_best.eval()
 prediction = []
@@ -309,26 +338,3 @@ df.to_csv("d11948002_hw3.csv",index = False)
 #%%
 
 
-
-
-
-
-#%%
-
-
-
-
-#%%
-
-
-
-
-
-#%%
-
-
-
-
-
-
-#%%
