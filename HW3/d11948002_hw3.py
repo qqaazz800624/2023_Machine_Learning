@@ -31,24 +31,27 @@ if torch.cuda.is_available():
 # Normally, We don't need augmentations in testing and validation.
 # All we need here is to resize the PIL image and transform it into Tensor.
 test_tfm = transforms.Compose([
-                transforms.Resize((128, 128)),
-                transforms.CenterCrop((128,128)),
+                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
+                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
                 ])
 
 # However, it is also possible to use augmentation in the testing phase.
 # You may use train_tfm to produce a variety of images and then test using ensemble methods
 train_tfm = transforms.Compose([
     # Resize the image into a fixed shape (height = width = 128)
-    transforms.Resize((128, 128)),
-    # You may add some transforms here.
-    transforms.RandomRotation(10), #對圖片從 (-10,10)之間隨機選擇旋轉角度
+    transforms.RandomRotation(30), #對圖片從 (-30,30)之間隨機選擇旋轉角度
+    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
     transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
+    transforms.Resize((224, 224)),
+    # You may add some transforms here.
+    #transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
     transforms.RandomCrop((128,128), padding = 10),
     # transforms.RandomAffine(degrees=(-20, 20),translate=(0.1, 0.3),scale=(0.5, 0.75)),
     # transforms.ColorJitter(brightness=0.1,contrast=0.2,saturation=0,hue=0),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
+    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
 ])
 
 
