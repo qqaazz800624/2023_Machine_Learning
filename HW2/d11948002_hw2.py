@@ -237,7 +237,7 @@ train_ratio = 0.7   # the ratio of data used for training, the rest will be used
 # training parameters
 seed = 50          # random seed
 batch_size = 512        # batch size
-num_epoch = 10         # the number of training epoch
+num_epoch = 15         # the number of training epoch
 learning_rate = 3e-4     # learning rate
 weight_decay = 0.03
 model_path = './model.ckpt'  # the path where the checkpoint will be saved
@@ -251,7 +251,7 @@ hidden_dim = 128           # the hidden dim
 # model parameters for LSTM
 input_size = 39 
 hidden_size = 512
-num_layers = 12
+num_layers = 10
 
 # decide which type of model to use, default: LSTM
 model_type = 'LSTM' 
@@ -288,6 +288,7 @@ else:
 
 criterion = nn.CrossEntropyLoss() 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.5)
 print(model)
 #%%
 
@@ -331,6 +332,7 @@ for epoch in range(num_epoch):
             val_acc += (val_pred.cpu() == labels.cpu()).sum().item() # get the index of the class with the highest probability
             val_loss += loss.item()
 
+    scheduler.step()
     print(f'[{epoch+1:03d}/{num_epoch:03d}] Train Acc: {train_acc/len(train_set):3.5f} Loss: {train_loss/len(train_loader):3.5f} | Val Acc: {val_acc/len(val_set):3.5f} loss: {val_loss/len(val_loader):3.5f}')
 
     # if the model improves, save a checkpoint at this epoch

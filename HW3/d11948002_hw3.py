@@ -31,9 +31,10 @@ if torch.cuda.is_available():
 # Normally, We don't need augmentations in testing and validation.
 # All we need here is to resize the PIL image and transform it into Tensor.
 test_tfm = transforms.Compose([
-    transforms.Resize((128, 128)),
-    transforms.ToTensor(),
-])
+                transforms.Resize((128, 128)),
+                transforms.CenterCrop((128,128)),
+                transforms.ToTensor(),
+                ])
 
 # However, it is also possible to use augmentation in the testing phase.
 # You may use train_tfm to produce a variety of images and then test using ensemble methods
@@ -41,15 +42,11 @@ train_tfm = transforms.Compose([
     # Resize the image into a fixed shape (height = width = 128)
     transforms.Resize((128, 128)),
     # You may add some transforms here.
-    transforms.RandomHorizontalFlip(p=1), #將所有圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
-    transforms.RandomAffine(degrees=(-20, 20),
-                            translate=(0.1, 0.3),
-                            scale=(0.5, 0.75)),
-    transforms.ColorJitter(brightness=0.1,
-                           contrast=0.2,
-                           saturation=0,
-                           hue=0
-                            ),
+    transforms.RandomRotation(10), #對圖片從 (-10,10)之間隨機選擇旋轉角度
+    transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
+    transforms.RandomCrop((128,128), padding = 10),
+    # transforms.RandomAffine(degrees=(-20, 20),translate=(0.1, 0.3),scale=(0.5, 0.75)),
+    # transforms.ColorJitter(brightness=0.1,contrast=0.2,saturation=0,hue=0),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
 ])
@@ -82,50 +79,50 @@ class FoodDataset(Dataset):
         return im,label
 
 
-class Classifier(nn.Module):
-    def __init__(self):
-        super(Classifier, self).__init__()
-        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-        # torch.nn.MaxPool2d(kernel_size, stride, padding)
-        # input 維度 [3, 128, 128]
-        self.cnn = nn.Sequential(
-            nn.Conv2d(3, 64, 3, 1, 1),  # [64, 128, 128]
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2, 0),      # [64, 64, 64]
+# class Classifier(nn.Module):
+#     def __init__(self):
+#         super(Classifier, self).__init__()
+#         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+#         # torch.nn.MaxPool2d(kernel_size, stride, padding)
+#         # input 維度 [3, 128, 128]
+#         self.cnn = nn.Sequential(
+#             nn.Conv2d(3, 64, 3, 1, 1),  # [64, 128, 128]
+#             nn.BatchNorm2d(64),
+#             nn.ReLU(),
+#             nn.MaxPool2d(2, 2, 0),      # [64, 64, 64]
 
-            nn.Conv2d(64, 128, 3, 1, 1), # [128, 64, 64]
-            nn.BatchNorm2d(128), 
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2, 0),      # [128, 32, 32]
+#             nn.Conv2d(64, 128, 3, 1, 1), # [128, 64, 64]
+#             nn.BatchNorm2d(128), 
+#             nn.ReLU(),
+#             nn.MaxPool2d(2, 2, 0),      # [128, 32, 32]
 
-            nn.Conv2d(128, 256, 3, 1, 1), # [256, 32, 32]
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2, 0),      # [256, 16, 16]
+#             nn.Conv2d(128, 256, 3, 1, 1), # [256, 32, 32]
+#             nn.BatchNorm2d(256),
+#             nn.ReLU(),
+#             nn.MaxPool2d(2, 2, 0),      # [256, 16, 16]
 
-            nn.Conv2d(256, 512, 3, 1, 1), # [512, 16, 16]
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2, 0),       # [512, 8, 8]
+#             nn.Conv2d(256, 512, 3, 1, 1), # [512, 16, 16]
+#             nn.BatchNorm2d(512),
+#             nn.ReLU(),
+#             nn.MaxPool2d(2, 2, 0),       # [512, 8, 8]
             
-            nn.Conv2d(512, 512, 3, 1, 1), # [512, 8, 8]
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2, 0),       # [512, 4, 4]
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Linear(512, 11)
-        )
+#             nn.Conv2d(512, 512, 3, 1, 1), # [512, 8, 8]
+#             nn.BatchNorm2d(512),
+#             nn.ReLU(),
+#             nn.MaxPool2d(2, 2, 0),       # [512, 4, 4]
+#         )
+#         self.fc = nn.Sequential(
+#             nn.Linear(512*4*4, 1024),
+#             nn.ReLU(),
+#             nn.Linear(1024, 512),
+#             nn.ReLU(),
+#             nn.Linear(512, 11)
+#         )
 
-    def forward(self, x):
-        out = self.cnn(x)
-        out = out.view(out.size()[0], -1)
-        return self.fc(out)
+#     def forward(self, x):
+#         out = self.cnn(x)
+#         out = out.view(out.size()[0], -1)
+#         return self.fc(out)
     
 #%% load pretrained model architecture
 
@@ -138,7 +135,7 @@ class MyModel(nn.Module):
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
-        self.cnn = models.resnet50(weights=False).to(device)
+        self.cnn = models.densenet121(weights=False).to(device)
         self.fc = nn.Sequential(
                         nn.Linear(1000, 1024),
                         nn.ReLU(),
@@ -166,7 +163,7 @@ model = MyModel().to(device)
 batch_size = 64
 
 # The number of training epochs.
-n_epochs = 100
+n_epochs = 150
 
 # If no improvement in 'patience' epochs, early stop.
 patience = 30
@@ -178,7 +175,7 @@ criterion = nn.CrossEntropyLoss()
 learning_rate = 3e-4
 weight_decay = 0.001
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 25, 40, 55, 70, 85], gamma=0.5)
+#scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 25, 40, 55, 70, 85], gamma=0.5)
 #%%
 
 # Construct train and valid datasets.
@@ -239,7 +236,7 @@ for epoch in range(n_epochs):
         
     train_loss = sum(train_loss) / len(train_loss)
     train_acc = sum(train_accs) / len(train_accs)
-    scheduler.step()
+    #scheduler.step()
     # Print the information.
     print(f"[ Train | {epoch + 1:03d}/{n_epochs:03d} ] loss = {train_loss:.5f}, acc = {train_acc:.5f}")
 
@@ -300,7 +297,7 @@ for epoch in range(n_epochs):
     else:
         stale += 1
         if stale > patience:
-            print(f"No improvment {patience} consecutive epochs, early stopping")
+            print(f"No improvment in {patience} consecutive epochs, early stopping")
             break
 
 
