@@ -36,7 +36,7 @@ test_tfm = transforms.Compose([
                 # transforms.Resize((255, 255)),
                 # transforms.CenterCrop((224, 224)),
                 transforms.ToTensor(),
-                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) #把 [channel, height, width] 的 mean及std 標準化
                 ])
 
 # However, it is also possible to use augmentation in the testing phase.
@@ -44,7 +44,14 @@ test_tfm = transforms.Compose([
 train_tfm = transforms.Compose([
     # Resize the image into a fixed shape (height = width = 128)
     transforms.RandomRotation(30), #對圖片從 (-30,30)之間隨機選擇旋轉角度
-    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
+    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2, scale=(0.8, 0.8)), 
+    
+    # RandomAffine: 對圖片進行仿射變
+    # degree:不對中心旋轉
+    # translate:對水平與垂直平移(斜移)0.2
+    # shear: 把圖片弄得有點像平行四邊形看是對x軸或是y軸,先在x軸,在 (-0.2, 0.2)之間隨機選擇錯切角度
+    # scale: 把寬與高的圖片的比例都縮小成原本的 0.8
+    
     transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
     # transforms.RandomResizedCrop((224, 224)),
     # transforms.RandomHorizontalFlip(),
@@ -57,7 +64,7 @@ train_tfm = transforms.Compose([
     # transforms.ColorJitter(brightness=0.1,contrast=0.2,saturation=0,hue=0),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
-    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) #把 [channel, height, width] 的 mean及std 標準化
 ])
 
 
@@ -184,7 +191,8 @@ criterion = nn.CrossEntropyLoss()
 learning_rate = 3e-4
 weight_decay = 0.001
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-#scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 25, 40, 55, 70, 85], gamma=0.5)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=10, verbose=False, 
+                                                       threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08)
 #%%
 
 # Construct train and valid datasets.
@@ -284,6 +292,7 @@ for epoch in range(n_epochs):
     valid_loss = sum(valid_loss) / len(valid_loss)
     valid_acc = sum(valid_accs) / len(valid_accs)
 
+    scheduler.step(metrics = valid_acc)
     # Print the information.
     print(f"[ Valid | {epoch + 1:03d}/{n_epochs:03d} ] loss = {valid_loss:.5f}, acc = {valid_acc:.5f}")
 

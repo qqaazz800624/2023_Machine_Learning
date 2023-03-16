@@ -144,7 +144,7 @@ class MyModel(nn.Module):
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
-        self.cnn = models.swin_t(weights=False).to(device)
+        self.cnn = models.resnet50(weights=False).to(device)
         self.fc = nn.Sequential(
                         nn.Linear(1000, 1024),
                         nn.ReLU(),
@@ -181,7 +181,7 @@ patience = 20
 criterion = nn.CrossEntropyLoss()
 
 # Initialize optimizer, you may fine-tune some hyperparameters such as learning rate on your own.
-learning_rate = 3e-3
+learning_rate = 3e-4
 weight_decay = 0.002
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=10, verbose=False, 
