@@ -162,7 +162,7 @@ class MyModel(nn.Module):
 #%%
 
 # "cuda" only when GPUs are available.
-device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
+device = "cuda:0" if torch.cuda.is_available() else "cuda:2"
 
 # Initialize a model, and put it on the device specified.
 #model = Classifier().to(device)
@@ -175,7 +175,7 @@ batch_size = 64
 n_epochs = 200
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 25
+patience = 20
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
@@ -246,7 +246,7 @@ for epoch in range(n_epochs):
         
     train_loss = sum(train_loss) / len(train_loss)
     train_acc = sum(train_accs) / len(train_accs)
-    scheduler.step()
+    #scheduler.step()
     # Print the information.
     print(f"[ Train | {epoch + 1:03d}/{n_epochs:03d} ] loss = {train_loss:.5f}, acc = {train_acc:.5f}")
 
@@ -285,6 +285,7 @@ for epoch in range(n_epochs):
     valid_loss = sum(valid_loss) / len(valid_loss)
     valid_acc = sum(valid_accs) / len(valid_accs)
 
+    scheduler.step(metrics = valid_acc)
     # Print the information.
     print(f"[ Valid | {epoch + 1:03d}/{n_epochs:03d} ] loss = {valid_loss:.5f}, acc = {valid_acc:.5f}")
 
