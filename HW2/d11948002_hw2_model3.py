@@ -235,10 +235,10 @@ concat_nframes = 39   # the number of frames to concat with, n must be odd (tota
 train_ratio = 0.7   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
-seed = 51          # random seed
+seed = 52          # random seed
 batch_size = 512        # batch size
-num_epoch = 20         # the number of training epoch
-learning_rate = 2e-4     # learning rate
+num_epoch = 25         # the number of training epoch
+learning_rate = 3e-3     # learning rate
 weight_decay = 0.03
 model_path = './model2.ckpt'  # the path where the checkpoint will be saved
 
@@ -380,7 +380,7 @@ with torch.no_grad():
         pred = np.concatenate((pred, test_pred.cpu().numpy()), axis=0)
 
 
-with open('/home/u/qqaazz800624/2023_Machine_Learning/HW2/outputs/d11948002_hw2_model2.csv', 'w') as f:
+with open('/home/u/qqaazz800624/2023_Machine_Learning/HW2/outputs/d11948002_hw2_model3.csv', 'w') as f:
     f.write('Id,Class\n')
     for i, y in enumerate(pred):
         f.write('{},{}\n'.format(i, y))

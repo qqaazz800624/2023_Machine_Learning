@@ -380,7 +380,7 @@ with torch.no_grad():
         pred = np.concatenate((pred, test_pred.cpu().numpy()), axis=0)
 
 
-with open('d11948002_hw2.csv', 'w') as f:
+with open('/home/u/qqaazz800624/2023_Machine_Learning/HW2/outputs/d11948002_hw2_model1.csv', 'w') as f:
     f.write('Id,Class\n')
     for i, y in enumerate(pred):
         f.write('{},{}\n'.format(i, y))
