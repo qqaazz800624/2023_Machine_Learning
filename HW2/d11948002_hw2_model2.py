@@ -240,7 +240,7 @@ batch_size = 512        # batch size
 num_epoch = 20         # the number of training epoch
 learning_rate = 2e-4     # learning rate
 weight_decay = 0.03
-model_path = './model.ckpt'  # the path where the checkpoint will be saved
+model_path = './model2.ckpt'  # the path where the checkpoint will be saved
 
 # model parameters for Linear Classifer. Used for gradescope.
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
