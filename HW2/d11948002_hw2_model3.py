@@ -1,4 +1,13 @@
 #%%
+
+'''
+reference link:
+1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
+2. https://github.com/Joshuaoneheart/ML2021-HWs
+3. https://github.com/pai4451/ML2021
+'''
+
+#%%
 import numpy as np
 import torch
 import torch.nn as nn
@@ -51,6 +60,8 @@ def concat_feat(x, concat_n, model_type='LSTM'):
 
     #return x.permute(1, 0, 2).view(seq_len, concat_n * feature_dim)
     # --- Modify Here to train LSTM ---
+    # reference link:
+    # 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
     if model_type == 'LSTM':
         return x.permute(1,0,2)
     else:
@@ -87,6 +98,8 @@ def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8
     max_len = 3000000
     #X = torch.empty(max_len, 39 * concat_nframes)
     # --- Modify Here to train LSTM ---
+    # reference link:
+    # 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
     if model_type == 'LSTM':
         X = torch.empty(max_len, concat_nframes, 39)
     else:
@@ -183,7 +196,8 @@ class Classifier(nn.Module):
         return x
 
 
-
+# reference link:
+# 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=1):
         super(LSTM, self).__init__()
@@ -235,10 +249,10 @@ concat_nframes = 39   # the number of frames to concat with, n must be odd (tota
 train_ratio = 0.7   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
-seed = 52          # random seed
+seed = 50          # random seed
 batch_size = 512        # batch size
 num_epoch = 25         # the number of training epoch
-learning_rate = 3e-3     # learning rate
+learning_rate = 3e-4     # learning rate
 weight_decay = 0.03
 model_path = './model2.ckpt'  # the path where the checkpoint will be saved
 
@@ -257,7 +271,7 @@ num_layers = 10
 model_type = 'LSTM' 
 
 same_seeds(seed)
-device = 'cuda:1' if torch.cuda.is_available() else 'cuda:3'
+device = 'cuda:2' if torch.cuda.is_available() else 'cuda:1'
 print(f'DEVICE: {device}')
 
 #%%

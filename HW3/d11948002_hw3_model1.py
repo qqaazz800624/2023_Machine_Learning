@@ -1,5 +1,13 @@
 #%%
 
+'''
+reference link:
+1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
+2. https://github.com/Joshuaoneheart/ML2021-HWs
+3. https://github.com/pai4451/ML2021
+'''
+#%%
+
 _exp_name = "sample"
 # Import necessary packages.
 import numpy as np
@@ -31,6 +39,9 @@ if torch.cuda.is_available():
 
 # Normally, We don't need augmentations in testing and validation.
 # All we need here is to resize the PIL image and transform it into Tensor.
+#reference link:
+#https://github.com/Joshuaoneheart/ML2021-HWs
+#https://github.com/pai4451/ML2021
 test_tfm = transforms.Compose([
                 transforms.Resize((224, 224)),
                 # transforms.Resize((255, 255)),
@@ -41,6 +52,9 @@ test_tfm = transforms.Compose([
 
 # However, it is also possible to use augmentation in the testing phase.
 # You may use train_tfm to produce a variety of images and then test using ensemble methods
+#reference link:
+#https://github.com/Joshuaoneheart/ML2021-HWs
+#https://github.com/pai4451/ML2021
 train_tfm = transforms.Compose([
     # Resize the image into a fixed shape (height = width = 128)
     transforms.RandomRotation(30), #對圖片從 (-30,30)之間隨機選擇旋轉角度
@@ -179,10 +193,10 @@ model = MyModel().to(device)
 batch_size = 64
 
 # The number of training epochs.
-n_epochs = 150
+n_epochs = 200
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 30
+patience = 20
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()

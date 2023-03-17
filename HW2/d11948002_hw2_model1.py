@@ -1,4 +1,14 @@
 #%%
+
+'''
+reference link:
+1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
+2. https://github.com/Joshuaoneheart/ML2021-HWs
+3. https://github.com/pai4451/ML2021
+'''
+
+
+#%%
 import numpy as np
 import torch
 import torch.nn as nn
@@ -51,6 +61,8 @@ def concat_feat(x, concat_n, model_type='LSTM'):
 
     #return x.permute(1, 0, 2).view(seq_len, concat_n * feature_dim)
     # --- Modify Here to train LSTM ---
+    # reference link:
+    # 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
     if model_type == 'LSTM':
         return x.permute(1,0,2)
     else:
@@ -87,6 +99,8 @@ def preprocess_data(split, feat_dir, phone_path, concat_nframes, train_ratio=0.8
     max_len = 3000000
     #X = torch.empty(max_len, 39 * concat_nframes)
     # --- Modify Here to train LSTM ---
+    # reference link:
+    # 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
     if model_type == 'LSTM':
         X = torch.empty(max_len, concat_nframes, 39)
     else:
@@ -183,7 +197,8 @@ class Classifier(nn.Module):
         return x
 
 
-
+# reference link:
+# 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=1):
         super(LSTM, self).__init__()
