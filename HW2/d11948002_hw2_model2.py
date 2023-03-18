@@ -272,7 +272,7 @@ num_layers = 10
 model_type = 'LSTM' 
 
 same_seeds(seed)
-device = 'cuda:1' if torch.cuda.is_available() else 'cuda:3'
+device = 'cuda:3' if torch.cuda.is_available() else 'cuda:3'
 print(f'DEVICE: {device}')
 
 #%%

@@ -5,6 +5,8 @@ reference link:
 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
 2. https://github.com/Joshuaoneheart/ML2021-HWs
 3. https://github.com/pai4451/ML2021
+
+model: classifier (manual)
 '''
 #%%
 
@@ -102,7 +104,7 @@ class FoodDataset(Dataset):
             
         return im,label
 
-device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
+device = "cuda:2" if torch.cuda.is_available() else "cuda:3"
 
 class Classifier(nn.Module):
     def __init__(self):
@@ -178,7 +180,7 @@ class Classifier(nn.Module):
 #%%
 
 # "cuda" only when GPUs are available.
-device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
+device = "cuda:2" if torch.cuda.is_available() else "cuda:3"
 
 # Initialize a model, and put it on the device specified.
 model = Classifier().to(device)
@@ -212,6 +214,7 @@ valid_set = FoodDataset('/neodata/ML/hw3_dataset/valid', tfm=test_tfm)
 valid_loader = DataLoader(valid_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
 
 #%%
+
 
 # Initialize trackers, these are not parameters and should not be changed
 stale = 0
@@ -328,15 +331,12 @@ for epoch in range(n_epochs):
             break
 
 
-#%%
 
 # Construct test datasets.
 # The argument "loader" tells how torchvision reads the data.
 test_set = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
-
-#%%
 
 model_best = Classifier().to(device)
 #model_best = MyModel().to(device)
@@ -349,7 +349,7 @@ with torch.no_grad():
         test_label = np.argmax(test_pred.cpu().data.numpy(), axis=1)
         prediction += test_label.squeeze().tolist()
 
-#%%
+
 
 #create test csv
 def pad4(i):
@@ -357,8 +357,86 @@ def pad4(i):
 df = pd.DataFrame()
 df["Id"] = [pad4(i) for i in range(len(test_set))]
 df["Category"] = prediction
-df.to_csv("d11948002_hw3_gradescope.csv",index = False)
+df.to_csv("/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_gradescope.csv",index = False)
+
+
+
+#%% Q2. Visual Representations Implementation
+
+import torch
+import numpy as np
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import matplotlib.cm as cm
+import torch.nn as nn
+
+device = 'cuda:2' if torch.cuda.is_available() else 'cuda:3'
+
+
+# Load the trained model
+model = Classifier().to(device)
+state_dict = torch.load(f"/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/{_exp_name}_best.ckpt")
+model.load_state_dict(state_dict)
+model.eval()
+
+print(model)
+#%%
+# Load the vaildation set defined by TA
+valid_set = FoodDataset("/neodata/ML/hw3_dataset/valid", tfm=test_tfm)
+valid_loader = DataLoader(valid_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=True)
+
+#%%
+# Extract the representations for the specific layer of model
+index = ... # You should find out the index of layer which is defined as "top" or 'mid' layer of your model.
+features = []
+labels = []
+for batch in tqdm(valid_loader):
+    imgs, lbls = batch
+    with torch.no_grad():
+        logits = model.cnn[:index](imgs.to(device))
+        logits = logits.view(logits.size()[0], -1)
+    labels.extend(lbls.cpu().numpy())
+    logits = np.squeeze(logits.cpu().numpy())
+    features.extend(logits)
+    
+features = np.array(features)
+colors_per_class = cm.rainbow(np.linspace(0, 1, 11))
+
+# Apply t-SNE to the features
+features_tsne = TSNE(n_components=2, init='pca', random_state=42).fit_transform(features)
+
+# Plot the t-SNE visualization
+plt.figure(figsize=(10, 8))
+for label in np.unique(labels):
+    plt.scatter(features_tsne[labels == label, 0], features_tsne[labels == label, 1], label=label, s=5)
+plt.legend()
+plt.show()
+
+
 
 #%%
 
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
 
