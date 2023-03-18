@@ -317,7 +317,7 @@ for epoch in range(n_epochs):
     # save models
     if valid_acc > best_acc:
         print(f"Best model found at epoch {epoch}, saving model")
-        torch.save(model.state_dict(), f"{_exp_name}_best.ckpt") # only save best to prevent output memory exceed error
+        torch.save(model.state_dict(), f"/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/{_exp_name}_best.ckpt") # only save best to prevent output memory exceed error
         best_acc = valid_acc
         stale = 0
     else:
@@ -339,7 +339,7 @@ test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_wor
 
 #model_best = Classifier().to(device)
 model_best = MyModel().to(device)
-model_best.load_state_dict(torch.load(f"{_exp_name}_best.ckpt"))
+model_best.load_state_dict(torch.load(f"/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/{_exp_name}_best.ckpt"))
 model_best.eval()
 prediction = []
 with torch.no_grad():
@@ -356,7 +356,7 @@ def pad4(i):
 df = pd.DataFrame()
 df["Id"] = [pad4(i) for i in range(len(test_set))]
 df["Category"] = prediction
-df.to_csv("d11948002_hw3_model2.csv",index = False)
+df.to_csv("/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_model2.csv",index = False)
 
 #%%
 

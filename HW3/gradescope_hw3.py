@@ -9,7 +9,7 @@ reference link:
 #%%
 
 
-_exp_name = "gradescope"
+_exp_name = "gradescope_hw3"
 # Import necessary packages.
 import numpy as np
 import pandas as pd
@@ -102,6 +102,7 @@ class FoodDataset(Dataset):
             
         return im,label
 
+device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
 
 class Classifier(nn.Module):
     def __init__(self):
@@ -136,7 +137,7 @@ class Classifier(nn.Module):
             nn.MaxPool2d(2, 2, 0),       # [512, 4, 4]
         )
         self.fc = nn.Sequential(
-            nn.Linear(512*4*4, 1024),
+            nn.Linear(25088, 1024),
             nn.ReLU(),
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -151,33 +152,33 @@ class Classifier(nn.Module):
 #%% load pretrained model architecture
 
 # "cuda" only when GPUs are available.
-device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
+# device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
 
-class MyModel(nn.Module):
-    def __init__(self):
-        super(MyModel, self).__init__()
-        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-        # torch.nn.MaxPool2d(kernel_size, stride, padding)
-        # input 維度 [3, 128, 128]
-        self.cnn = models.resnet50(weights=False).to(device)
-        self.fc = nn.Sequential(
-                        nn.Linear(1000, 1024),
-                        nn.ReLU(),
-                        nn.Linear(1024, 512),
-                        nn.ReLU(),
-                        nn.Linear(512, 11)
-                        ).to(device)
+# class MyModel(nn.Module):
+#     def __init__(self):
+#         super(MyModel, self).__init__()
+#         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+#         # torch.nn.MaxPool2d(kernel_size, stride, padding)
+#         # input 維度 [3, 128, 128]
+#         self.cnn = models.resnet50(weights=False).to(device)
+#         self.fc = nn.Sequential(
+#                         nn.Linear(1000, 1024),
+#                         nn.ReLU(),
+#                         nn.Linear(1024, 512),
+#                         nn.ReLU(),
+#                         nn.Linear(512, 11)
+#                         ).to(device)
 
-    def forward(self, x):
-        out = self.cnn(x)
-        out = out.view(out.size()[0], -1)
-        return self.fc(out)
+#     def forward(self, x):
+#         out = self.cnn(x)
+#         out = out.view(out.size()[0], -1)
+#         return self.fc(out)
 
 
 #%%
 
 # "cuda" only when GPUs are available.
-device = "cuda:0" if torch.cuda.is_available() else "cuda:2"
+device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
 
 # Initialize a model, and put it on the device specified.
 model = Classifier().to(device)

@@ -250,10 +250,10 @@ concat_nframes = 39   # the number of frames to concat with, n must be odd (tota
 train_ratio = 0.7   # the ratio of data used for training, the rest will be used for validation
 
 # training parameters
-seed = 51          # random seed
+seed = 6          # random seed
 batch_size = 512        # batch size
-num_epoch = 20         # the number of training epoch
-learning_rate = 2e-4     # learning rate
+num_epoch = 25         # the number of training epoch
+learning_rate = 3e-4     # learning rate
 weight_decay = 0.03
 model_path = './model2.ckpt'  # the path where the checkpoint will be saved
 
