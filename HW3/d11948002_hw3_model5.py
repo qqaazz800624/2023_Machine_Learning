@@ -153,7 +153,7 @@ class FoodDataset(Dataset):
 #%% load pretrained model architecture
 
 # "cuda" only when GPUs are available.
-device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
+device = "cuda:1" if torch.cuda.is_available() else "cuda:2"
 
 class MyModel(nn.Module):
     def __init__(self):
@@ -192,7 +192,7 @@ batch_size = 64
 n_epochs = 200
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 25
+patience = 20
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
