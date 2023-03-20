@@ -1,14 +1,5 @@
 #%%
 
-'''
-reference link:
-1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
-2. https://github.com/Joshuaoneheart/ML2021-HWs
-3. https://github.com/pai4451/ML2021
-'''
-
-
-#%%
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,6 +11,7 @@ import gc
 
 
 #%%
+
 
 def same_seeds(seed):
     random.seed(seed) 
@@ -153,55 +145,11 @@ class LibriDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
-
 #%%
 
-class BasicBlock(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(BasicBlock, self).__init__()
-
-        # TODO: apply batch normalization and dropout for strong baseline.
-        # Reference: https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm1d.html (batch normalization)
-        #       https://pytorch.org/docs/stable/generated/torch.nn.Dropout.html (dropout)
-        self.block = nn.Sequential(
-            nn.Linear(input_dim, output_dim),
-            nn.ReLU(),
-            nn.BatchNorm1d(output_dim),
-            nn.Dropout(0.75),
-        )
-        # self.block = nn.LSTM(         
-        #             input_size=input_size,
-        #             hidden_size=hidden_size,        
-        #             num_layers=num_layers,          
-        #             batch_first=True,     #(batch, time_step, input_size)
-        #             dropout=0.1
-        #             )
-
-    def forward(self, x):
-        x = self.block(x)
-        return x
-
-
-class Classifier(nn.Module):
-    def __init__(self, input_dim, output_dim=41, hidden_layers=1, hidden_dim=256):
-        super(Classifier, self).__init__()
-
-        self.fc = nn.Sequential(
-                    BasicBlock(input_dim, hidden_dim),
-                    *[BasicBlock(hidden_dim, hidden_dim) for _ in range(hidden_layers)],
-                    nn.Linear(hidden_dim, output_dim)
-                    )
-
-    def forward(self, x):
-        x = self.fc(x)
-        return x
-
-
-# reference link:
-# 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
-class LSTM(nn.Module):
+class LSTM1(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=1):
-        super(LSTM, self).__init__()
+        super(LSTM1, self).__init__()
 
         self.lstm = nn.LSTM(         
                     input_size=input_size,
@@ -241,9 +189,132 @@ class LSTM(nn.Module):
         out = self.out(output[:, -1, :])
         return out
 
-#%%
 
-torch.rand(5,3,2)
+class LSTM2(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=1):
+        super(LSTM2, self).__init__()
+
+        self.lstm = nn.LSTM(         
+                    input_size=input_size,
+                    hidden_size=hidden_size,        
+                    num_layers=num_layers,          
+                    batch_first=True,     #(batch, time_step, input_size)
+                    dropout=0.3,
+                    bidirectional = True
+                    )
+
+        self.out = nn.Sequential(
+                    nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size, hidden_size//2), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//2),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//2, hidden_size//4), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//4),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//4, hidden_size//8), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//8),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//8, 41)   # 41 is class of output
+                )
+
+    def forward(self, x):
+        # x.shape (batch, time_step, input_size)
+        # output.shape (batch, time_step, output_size)
+        # hidden_state.shape (n_layers, batch, hidden_size)
+        # cell_state.shape (n_layers, batch, hidden_size)
+        output, (hidden_state, cell_state) = self.lstm(x, None)
+        out = self.out(output[:, -1, :])
+        return out
+
+class LSTM3(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=1):
+        super(LSTM3, self).__init__()
+
+        self.lstm = nn.LSTM(         
+                    input_size=input_size,
+                    hidden_size=hidden_size,        
+                    num_layers=num_layers,          
+                    batch_first=True,     #(batch, time_step, input_size)
+                    dropout=0.3,
+                    bidirectional = True
+                    )
+
+        self.out = nn.Sequential(
+                    nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size, hidden_size//2), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//2),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//2, hidden_size//4), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//4),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//4, hidden_size//8), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//8),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//8, 41)   # 41 is class of output
+                )
+
+    def forward(self, x):
+        # x.shape (batch, time_step, input_size)
+        # output.shape (batch, time_step, output_size)
+        # hidden_state.shape (n_layers, batch, hidden_size)
+        # cell_state.shape (n_layers, batch, hidden_size)
+        output, (hidden_state, cell_state) = self.lstm(x, None)
+        out = self.out(output[:, -1, :])
+        return out
+    
+class LSTM4(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=1):
+        super(LSTM4, self).__init__()
+
+        self.lstm = nn.LSTM(         
+                    input_size=input_size,
+                    hidden_size=hidden_size,        
+                    num_layers=num_layers,          
+                    batch_first=True,     #(batch, time_step, input_size)
+                    dropout=0.3,
+                    bidirectional = True
+                    )
+
+        self.out = nn.Sequential(
+                    nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size, hidden_size//2), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//2),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//2, hidden_size//4), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//4),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//4, hidden_size//8), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//8),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//8, 41)   # 41 is class of output
+                )
+
+    def forward(self, x):
+        # x.shape (batch, time_step, input_size)
+        # output.shape (batch, time_step, output_size)
+        # hidden_state.shape (n_layers, batch, hidden_size)
+        # cell_state.shape (n_layers, batch, hidden_size)
+        output, (hidden_state, cell_state) = self.lstm(x, None)
+        out = self.out(output[:, -1, :])
+        return out
 
 #%% Hyperparameters Configs
 
@@ -255,154 +326,79 @@ train_ratio = 0.7   # the ratio of data used for training, the rest will be used
 # training parameters
 seed = 6          # random seed
 batch_size = 512        # batch size
-num_epoch = 25         # the number of training epoch
-learning_rate = 3e-4     # learning rate
-weight_decay = 0.03
-model_path = './model2.ckpt'  # the path where the checkpoint will be saved
 
-# model parameters for Linear Classifer. Used for gradescope.
+model1_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model.ckpt'  
+model2_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model2.ckpt'  
+model3_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model3.ckpt' 
+model4_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model4.ckpt'  
+
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
 hidden_layers = 6          # the number of hidden layers
 hidden_dim = 128           # the hidden dim
 
 # model parameters for LSTM
-input_size = 39 
-hidden_size = 512
-num_layers = 10
-
-# decide which type of model to use, default: LSTM
-model_type = 'LSTM' 
+model_type='LSTM'
 
 same_seeds(seed)
 device = 'cuda:3' if torch.cuda.is_available() else 'cuda:3'
 print(f'DEVICE: {device}')
 
 #%%
-# preprocess data
-train_X, train_y = preprocess_data(split='train', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio, model_type=model_type)
-val_X, val_y = preprocess_data(split='val', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, train_ratio=train_ratio, model_type=model_type)
-
-# get dataset
-train_set = LibriDataset(train_X, train_y)
-val_set = LibriDataset(val_X, val_y)
-
-# remove raw feature to save memory
-del train_X, train_y, val_X, val_y
-gc.collect()
-
-# get dataloader
-train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False)
-
-#%%
-
-# create model, define a loss function, and optimizer
-#model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
-if model_type == 'LSTM':
-    model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
-else:
-    model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
-
-criterion = nn.CrossEntropyLoss() 
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10, 15], gamma=0.5)
-print(model)
-#%%
-
-best_acc = 0.0
-for epoch in range(num_epoch):
-    train_acc = 0.0
-    train_loss = 0.0
-    val_acc = 0.0
-    val_loss = 0.0
-    
-    # training
-    model.train() # set the model to training mode
-    for i, batch in enumerate(tqdm(train_loader)):
-        features, labels = batch
-        features = features.to(device)
-        labels = labels.to(device)
-        
-        optimizer.zero_grad() 
-        outputs = model(features) 
-        
-        loss = criterion(outputs, labels)
-        loss.backward() 
-        optimizer.step() 
-        
-        _, train_pred = torch.max(outputs, 1) # get the index of the class with the highest probability
-        train_acc += (train_pred.detach() == labels.detach()).sum().item()
-        train_loss += loss.item()
-    
-    # validation
-    model.eval() # set the model to evaluation mode
-    with torch.no_grad():
-        for i, batch in enumerate(tqdm(val_loader)):
-            features, labels = batch
-            features = features.to(device)
-            labels = labels.to(device)
-            outputs = model(features)
-            
-            loss = criterion(outputs, labels) 
-            
-            _, val_pred = torch.max(outputs, 1) 
-            val_acc += (val_pred.cpu() == labels.cpu()).sum().item() # get the index of the class with the highest probability
-            val_loss += loss.item()
-
-    scheduler.step()
-    print(f'[{epoch+1:03d}/{num_epoch:03d}] Train Acc: {train_acc/len(train_set):3.5f} Loss: {train_loss/len(train_loader):3.5f} | Val Acc: {val_acc/len(val_set):3.5f} loss: {val_loss/len(val_loader):3.5f}')
-
-    # if the model improves, save a checkpoint at this epoch
-    if val_acc > best_acc:
-        best_acc = val_acc
-        torch.save(model.state_dict(), model_path)
-        print(f'saving model with acc {best_acc/len(val_set):.5f}')
-#%%
-
-del train_set, val_set
-del train_loader, val_loader
-gc.collect()
-
-#%%
 
 # load data
-test_X = preprocess_data(split='test', feat_dir='./libriphone/feat', phone_path='./libriphone', concat_nframes=concat_nframes, model_type=model_type)
+test_X = preprocess_data(split='test', feat_dir='./libriphone/feat'
+                         , phone_path='./libriphone'
+                         , concat_nframes=concat_nframes
+                         , model_type=model_type)
 test_set = LibriDataset(test_X, None)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 
+#%%
 # load model
-#model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
-
-if model_type == 'LSTM':
-    model = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers).to(device)
-else:
-    model = Classifier(input_dim=input_dim, hidden_layers=hidden_layers, hidden_dim=hidden_dim).to(device)
-
-model.load_state_dict(torch.load(model_path))
+model1 = LSTM1(input_size=39, hidden_size=512, num_layers=10).to(device)
+model1.load_state_dict(torch.load(model1_path))
+model2 = LSTM2(input_size=39, hidden_size=512, num_layers=10).to(device)
+model2.load_state_dict(torch.load(model2_path))
+model3 = LSTM3(input_size=39, hidden_size=512, num_layers=10).to(device)
+model3.load_state_dict(torch.load(model3_path))
+model4 = LSTM4(input_size=39, hidden_size=512, num_layers=10).to(device)
+model4.load_state_dict(torch.load(model4_path))
 
 
 #%%
 
-pred = np.array([], dtype=np.int32)
+predict = []
+model1.eval() # set model1 to evaluation mode
+model2.eval() # set model2 to evaluation mode
+model3.eval() # set model3 to evaluation mode
+model4.eval() # set model4 to evaluation mode
 
-model.eval()
 with torch.no_grad():
-    for i, batch in enumerate(tqdm(test_loader)):
-        features = batch
-        features = features.to(device)
-
-        outputs = model(features)
-
+    for i, data in enumerate(test_loader):
+        inputs = data
+        inputs = inputs.to(device)
+        outputs1 = model1(inputs)
+        outputs2 = model2(inputs)
+        outputs3 = model3(inputs)
+        outputs4 = model4(inputs)
+        outputs = (outputs1 + outputs2 + outputs3 + outputs4) / 4
         _, test_pred = torch.max(outputs, 1) # get the index of the class with the highest probability
-        pred = np.concatenate((pred, test_pred.cpu().numpy()), axis=0)
 
+        for y in test_pred.cpu().numpy():
+            predict.append(y)
 
-with open('/home/u/qqaazz800624/2023_Machine_Learning/HW2/outputs/d11948002_hw2_model2.csv', 'w') as f:
+#%%
+
+with open('/home/u/qqaazz800624/2023_Machine_Learning/HW2/outputs/ensemble2.csv', 'w') as f:
     f.write('Id,Class\n')
-    for i, y in enumerate(pred):
+    for i, y in enumerate(predict):
         f.write('{},{}\n'.format(i, y))
 
 
 #%%
 
+
+
+
+#%%
