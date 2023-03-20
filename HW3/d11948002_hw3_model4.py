@@ -161,7 +161,7 @@ class MyModel(nn.Module):
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
-        self.cnn = models.squeezenet1_0(weights=False).to(device)
+        self.cnn = models.resnet101(weights=False).to(device)
         self.fc = nn.Sequential(
                         nn.Linear(1000, 1024),
                         nn.ReLU(),
@@ -189,10 +189,10 @@ model = MyModel().to(device)
 batch_size = 64
 
 # The number of training epochs.
-n_epochs = 200
+n_epochs = 350
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 25
+patience = 35
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()

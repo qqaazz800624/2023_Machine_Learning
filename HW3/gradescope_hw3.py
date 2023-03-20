@@ -28,6 +28,11 @@ from torchvision.datasets import DatasetFolder, VisionDataset
 from tqdm.auto import tqdm
 import random
 from randaugment import ImageNetPolicy
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import matplotlib.cm as cm
+
 
 
 myseed = 6666  # set a random seed for reproducibility
@@ -65,7 +70,7 @@ train_tfm = transforms.Compose([
     transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
     # transforms.RandomResizedCrop((224, 224)),
     # transforms.RandomHorizontalFlip(),
-    # ImageNetPolicy(),
+    #ImageNetPolicy(),
     transforms.Resize((224, 224)),
     # You may add some transforms here.
     #transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
@@ -104,7 +109,7 @@ class FoodDataset(Dataset):
             
         return im,label
 
-device = "cuda:2" if torch.cuda.is_available() else "cuda:3"
+#device = "cuda:1" if torch.cuda.is_available() else "cuda:3"
 
 class Classifier(nn.Module):
     def __init__(self):
@@ -119,7 +124,7 @@ class Classifier(nn.Module):
             nn.MaxPool2d(2, 2, 0),      # [64, 64, 64]
 
             nn.Conv2d(64, 128, 3, 1, 1), # [128, 64, 64]
-            nn.BatchNorm2d(128), 
+            nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(2, 2, 0),      # [128, 32, 32]
 
@@ -150,59 +155,32 @@ class Classifier(nn.Module):
         out = self.cnn(x)
         out = out.view(out.size()[0], -1)
         return self.fc(out)
-    
-#%% load pretrained model architecture
+ 
+
 
 # "cuda" only when GPUs are available.
-# device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
-
-# class MyModel(nn.Module):
-#     def __init__(self):
-#         super(MyModel, self).__init__()
-#         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-#         # torch.nn.MaxPool2d(kernel_size, stride, padding)
-#         # input 維度 [3, 128, 128]
-#         self.cnn = models.resnet50(weights=False).to(device)
-#         self.fc = nn.Sequential(
-#                         nn.Linear(1000, 1024),
-#                         nn.ReLU(),
-#                         nn.Linear(1024, 512),
-#                         nn.ReLU(),
-#                         nn.Linear(512, 11)
-#                         ).to(device)
-
-#     def forward(self, x):
-#         out = self.cnn(x)
-#         out = out.view(out.size()[0], -1)
-#         return self.fc(out)
-
-
-#%%
-
-# "cuda" only when GPUs are available.
-device = "cuda:2" if torch.cuda.is_available() else "cuda:3"
+device = "cuda:1" if torch.cuda.is_available() else "cuda:3"
 
 # Initialize a model, and put it on the device specified.
 model = Classifier().to(device)
-#model = MyModel().to(device)
 
 # The number of batch size.
 batch_size = 64
 
 # The number of training epochs.
-n_epochs = 200
+n_epochs = 250
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 20
+patience = 35
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
 
 # Initialize optimizer, you may fine-tune some hyperparameters such as learning rate on your own.
 learning_rate = 3e-4
-weight_decay = 0.002
+weight_decay = 0.02
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=10, verbose=False, 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=20, verbose=False, 
                                                        threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08)
 
 
@@ -215,7 +193,6 @@ valid_loader = DataLoader(valid_set, batch_size=batch_size, shuffle=True, num_wo
 
 #%%
 
-'''
 # Initialize trackers, these are not parameters and should not be changed
 stale = 0
 best_acc = 0
@@ -265,7 +242,7 @@ for epoch in range(n_epochs):
         
     train_loss = sum(train_loss) / len(train_loss)
     train_acc = sum(train_accs) / len(train_accs)
-    #scheduler.step()
+
     # Print the information.
     print(f"[ Train | {epoch + 1:03d}/{n_epochs:03d} ] loss = {train_loss:.5f}, acc = {train_acc:.5f}")
 
@@ -321,58 +298,17 @@ for epoch in range(n_epochs):
     # save models
     if valid_acc > best_acc:
         print(f"Best model found at epoch {epoch}, saving model")
-        torch.save(model.state_dict(), f"{_exp_name}_best.ckpt") # only save best to prevent output memory exceed error
+        torch.save(model.state_dict(), f"/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/{_exp_name}_best.ckpt") # only save best to prevent output memory exceed error
         best_acc = valid_acc
         stale = 0
     else:
         stale += 1
         if stale > patience:
-            print(f"No improvment in {patience} consecutive epochs, early stopping")
+            print(f"No improvment {patience} consecutive epochs, early stopping")
             break
 
 
-
-# Construct test datasets.
-# The argument "loader" tells how torchvision reads the data.
-test_set = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm)
-test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-
-
-model_best = Classifier().to(device)
-#model_best = MyModel().to(device)
-model_best.load_state_dict(torch.load(f"{_exp_name}_best.ckpt"))
-model_best.eval()
-prediction = []
-with torch.no_grad():
-    for data,_ in tqdm(test_loader):
-        test_pred = model_best(data.to(device))
-        test_label = np.argmax(test_pred.cpu().data.numpy(), axis=1)
-        prediction += test_label.squeeze().tolist()
-
-
-
-#create test csv
-def pad4(i):
-    return "0"*(4-len(str(i)))+str(i)
-df = pd.DataFrame()
-df["Id"] = [pad4(i) for i in range(len(test_set))]
-df["Category"] = prediction
-df.to_csv("/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_gradescope.csv",index = False)
-'''
-
-
 #%% Q2. Visual Representations Implementation
-
-import torch
-import numpy as np
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import matplotlib.cm as cm
-import torch.nn as nn
-
-device = 'cuda:2' if torch.cuda.is_available() else 'cuda:3'
-
 
 # Load the trained model
 model = Classifier().to(device)
@@ -381,15 +317,15 @@ model.load_state_dict(state_dict)
 model.eval()
 
 print(model)
+
 #%%
 # Load the vaildation set defined by TA
 valid_set = FoodDataset("/neodata/ML/hw3_dataset/valid", tfm=test_tfm)
 valid_loader = DataLoader(valid_set, batch_size=64, shuffle=False, num_workers=0, pin_memory=True)
 
-#%% 
-# Extract the representations for the specific layer of model
+#%% Extract the representations for the specific layer of model
 # mid layers
-index_start, index_end = 0, 6 # You should find out the index of layer which is defined as "top" or 'mid' layer of your model.
+index=12 # You should find out the index of layer which is defined as "top" or 'mid' layer of your model.
 features = []
 labels = []
 
@@ -397,12 +333,12 @@ labels = []
 for batch in tqdm(valid_loader):
     imgs, lbls = batch
     with torch.no_grad():
-        logits = model.cnn[:index_end](imgs.to(device))
+        logits = model.cnn[:index](imgs.to(device))
         logits = logits.view(logits.size()[0], -1)
     labels.extend(lbls.cpu().numpy())
     logits = np.squeeze(logits.cpu().numpy())
     features.extend(logits)
-    
+
 features = np.array(features)
 colors_per_class = cm.rainbow(np.linspace(0, 1, 11))
 
@@ -414,8 +350,39 @@ plt.figure(figsize=(10, 8))
 for label in np.unique(labels):
     plt.scatter(features_tsne[labels == label, 0], features_tsne[labels == label, 1], label=label, s=5)
 plt.legend()
-plt.show()
+#plt.show()
+plt.savefig('/home/u/qqaazz800624/2023_Machine_Learning/HW3/images/mid_tsne.png')
 
+
+#%% Extract the representations for the specific layer of model
+# top layers
+index=20 # You should find out the index of layer which is defined as "top" or 'mid' layer of your model.
+features = []
+labels = []
+
+
+for batch in tqdm(valid_loader):
+    imgs, lbls = batch
+    with torch.no_grad():
+        logits = model.cnn[:index](imgs.to(device))
+        logits = logits.view(logits.size()[0], -1)
+    labels.extend(lbls.cpu().numpy())
+    logits = np.squeeze(logits.cpu().numpy())
+    features.extend(logits)
+
+features = np.array(features)
+colors_per_class = cm.rainbow(np.linspace(0, 1, 11))
+
+# Apply t-SNE to the features
+features_tsne = TSNE(n_components=2, init='pca', random_state=42).fit_transform(features)
+
+# Plot the t-SNE visualization
+plt.figure(figsize=(10, 8))
+for label in np.unique(labels):
+    plt.scatter(features_tsne[labels == label, 0], features_tsne[labels == label, 1], label=label, s=5)
+plt.legend()
+#plt.show()
+plt.savefig('/home/u/qqaazz800624/2023_Machine_Learning/HW3/images/top_tsne.png')
 
 
 #%%
