@@ -5,10 +5,13 @@ reference link:
 1. https://github.com/Singyuan/Machine-Learning-NTUEE-2022/tree/master/hw2
 2. https://github.com/Joshuaoneheart/ML2021-HWs
 3. https://github.com/pai4451/ML2021
+
+predefined model: squeezenet1_0
 '''
 #%%
 
-_exp_name = "sample"
+
+_exp_name = "model7"
 # Import necessary packages.
 import numpy as np
 import pandas as pd
@@ -47,7 +50,7 @@ test_tfm = transforms.Compose([
                 # transforms.Resize((255, 255)),
                 # transforms.CenterCrop((224, 224)),
                 transforms.ToTensor(),
-                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) #把 [channel, height, width] 的 mean及std 標準化
+                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
                 ])
 
 # However, it is also possible to use augmentation in the testing phase.
@@ -58,18 +61,11 @@ test_tfm = transforms.Compose([
 train_tfm = transforms.Compose([
     # Resize the image into a fixed shape (height = width = 128)
     transforms.RandomRotation(30), #對圖片從 (-30,30)之間隨機選擇旋轉角度
-    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2, scale=(0.8, 0.8)), 
-    
-    # RandomAffine: 對圖片進行仿射變
-    # degree:不對中心旋轉
-    # translate:對水平與垂直平移(斜移)0.2
-    # shear: 把圖片弄得有點像平行四邊形看是對x軸或是y軸,先在x軸,在 (-0.2, 0.2)之間隨機選擇錯切角度
-    # scale: 把寬與高的圖片的比例都縮小成原本的 0.8
-    
+    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
     transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
     # transforms.RandomResizedCrop((224, 224)),
     # transforms.RandomHorizontalFlip(),
-    # ImageNetPolicy(),
+    #ImageNetPolicy(),
     transforms.Resize((224, 224)),
     # You may add some transforms here.
     #transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
@@ -78,7 +74,7 @@ train_tfm = transforms.Compose([
     # transforms.ColorJitter(brightness=0.1,contrast=0.2,saturation=0,hue=0),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
-    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) #把 [channel, height, width] 的 mean及std 標準化
+    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
 ])
 
 
@@ -157,7 +153,7 @@ class FoodDataset(Dataset):
 #%% load pretrained model architecture
 
 # "cuda" only when GPUs are available.
-device = "cuda:3" if torch.cuda.is_available() else "cuda:2"
+device = "cuda:2" if torch.cuda.is_available() else "cuda:0"
 
 class MyModel(nn.Module):
     def __init__(self):
@@ -165,7 +161,7 @@ class MyModel(nn.Module):
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
-        self.cnn = models.densenet121(weights=False).to(device)
+        self.cnn = models.vgg11(weights=False).to(device)
         self.fc = nn.Sequential(
                         nn.Linear(1000, 1024),
                         nn.ReLU(),
@@ -182,6 +178,9 @@ class MyModel(nn.Module):
 
 #%%
 
+# "cuda" only when GPUs are available.
+#device = "cuda:0" if torch.cuda.is_available() else "cuda:0"
+
 # Initialize a model, and put it on the device specified.
 #model = Classifier().to(device)
 model = MyModel().to(device)
@@ -193,16 +192,16 @@ batch_size = 64
 n_epochs = 200
 
 # If no improvement in 'patience' epochs, early stop.
-patience = 20
+patience = 30
 
 # For the classification task, we use cross-entropy as the measurement of performance.
 criterion = nn.CrossEntropyLoss()
 
 # Initialize optimizer, you may fine-tune some hyperparameters such as learning rate on your own.
 learning_rate = 3e-4
-weight_decay = 0.001
+weight_decay = 0.02
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=10, verbose=False, 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.8, patience=20, verbose=False, 
                                                        threshold=0.0001, threshold_mode='rel', cooldown=0, min_lr=0, eps=1e-08)
 #%%
 
@@ -316,7 +315,7 @@ for epoch in range(n_epochs):
         with open(f"./{_exp_name}_log.txt","a"):
             print(f"[ Valid | {epoch + 1:03d}/{n_epochs:03d} ] loss = {valid_loss:.5f}, acc = {valid_acc:.5f}")
 
-    
+
     # save models
     if valid_acc > best_acc:
         print(f"Best model found at epoch {epoch}, saving model")
@@ -359,7 +358,7 @@ def pad4(i):
 df = pd.DataFrame()
 df["Id"] = [pad4(i) for i in range(len(test_set))]
 df["Category"] = prediction
-df.to_csv("/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_model1.csv",index = False)
+df.to_csv(f"/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_{_exp_name}.csv",index = False)
 
 #%%
 
