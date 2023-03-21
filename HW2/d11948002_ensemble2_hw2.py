@@ -10,8 +10,6 @@ from torch.utils.data import Dataset, DataLoader
 import gc
 
 
-#%%
-
 
 def same_seeds(seed):
     random.seed(seed) 
@@ -316,6 +314,49 @@ class LSTM4(nn.Module):
         out = self.out(output[:, -1, :])
         return out
 
+
+class LSTM5(nn.Module):
+    def __init__(self, input_size, hidden_size=64, num_layers=1):
+        super(LSTM5, self).__init__()
+
+        self.lstm = nn.LSTM(         
+                    input_size=input_size,
+                    hidden_size=hidden_size,        
+                    num_layers=num_layers,          
+                    batch_first=True,     #(batch, time_step, input_size)
+                    dropout=0.3,
+                    bidirectional = True
+                    )
+
+        self.out = nn.Sequential(
+                    nn.Linear(hidden_size*2, hidden_size), # multiply 2 because of bidirectional
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size, hidden_size//2), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//2),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//2, hidden_size//4), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//4),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//4, hidden_size//8), 
+                    nn.ReLU(),
+                    nn.BatchNorm1d(hidden_size//8),
+                    nn.Dropout(0.3),
+                    nn.Linear(hidden_size//8, 41)   # 41 is class of output
+                )
+
+    def forward(self, x):
+        # x.shape (batch, time_step, input_size)
+        # output.shape (batch, time_step, output_size)
+        # hidden_state.shape (n_layers, batch, hidden_size)
+        # cell_state.shape (n_layers, batch, hidden_size)
+        output, (hidden_state, cell_state) = self.lstm(x, None)
+        out = self.out(output[:, -1, :])
+        return out
+
 #%% Hyperparameters Configs
 
 # data prarameters
@@ -331,6 +372,7 @@ model1_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model.ckpt'
 model2_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model2.ckpt'  
 model3_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model3.ckpt' 
 model4_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model4.ckpt'  
+model5_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW2/model5.ckpt'  
 
 # TODO: change the value of "hidden_layers" or "hidden_dim" for medium baseline
 input_dim = 39 * concat_nframes  # the input dim of the model, you should not change the value
@@ -341,7 +383,7 @@ hidden_dim = 128           # the hidden dim
 model_type='LSTM'
 
 same_seeds(seed)
-device = 'cuda:3' if torch.cuda.is_available() else 'cuda:3'
+device = 'cuda:1' if torch.cuda.is_available() else 'cuda:3'
 print(f'DEVICE: {device}')
 
 #%%
@@ -364,6 +406,8 @@ model3 = LSTM3(input_size=39, hidden_size=512, num_layers=10).to(device)
 model3.load_state_dict(torch.load(model3_path))
 model4 = LSTM4(input_size=39, hidden_size=512, num_layers=10).to(device)
 model4.load_state_dict(torch.load(model4_path))
+model5 = LSTM4(input_size=39, hidden_size=256, num_layers=12).to(device)
+model5.load_state_dict(torch.load(model5_path))
 
 
 #%%
@@ -373,6 +417,7 @@ model1.eval() # set model1 to evaluation mode
 model2.eval() # set model2 to evaluation mode
 model3.eval() # set model3 to evaluation mode
 model4.eval() # set model4 to evaluation mode
+model5.eval()
 
 with torch.no_grad():
     for i, data in enumerate(test_loader):
@@ -382,7 +427,8 @@ with torch.no_grad():
         outputs2 = model2(inputs)
         outputs3 = model3(inputs)
         outputs4 = model4(inputs)
-        outputs = (outputs1 + outputs2 + outputs3 + outputs4) / 4
+        outputs5 = model5(inputs)
+        outputs = (outputs1 + outputs2 + outputs3 + outputs4 + outputs5) / 5
         _, test_pred = torch.max(outputs, 1) # get the index of the class with the highest probability
 
         for y in test_pred.cpu().numpy():
