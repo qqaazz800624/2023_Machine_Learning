@@ -104,7 +104,7 @@ class FoodDataset(Dataset):
         return im,label
 
 # "cuda" only when GPUs are available.
-device = "cuda:2" if torch.cuda.is_available() else "cuda:1"
+device = "cuda:3" if torch.cuda.is_available() else "cuda:1"
 
 #%%
 
@@ -231,6 +231,71 @@ class MyModel6(nn.Module):
         out = out.view(out.size()[0], -1)
         return self.fc(out)
 
+
+class MyModel7(nn.Module):
+    def __init__(self):
+        super(MyModel7, self).__init__()
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        # torch.nn.MaxPool2d(kernel_size, stride, padding)
+        # input 維度 [3, 128, 128]
+        self.cnn = models.vgg11(weights=False).to(device)
+        self.fc = nn.Sequential(
+                        nn.Linear(1000, 1024),
+                        nn.ReLU(),
+                        nn.Linear(1024, 512),
+                        nn.ReLU(),
+                        nn.Linear(512, 11)
+                        ).to(device)
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.view(out.size()[0], -1)
+        return self.fc(out)
+    
+class Classifier(nn.Module):
+    def __init__(self):
+        super(Classifier, self).__init__()
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        # torch.nn.MaxPool2d(kernel_size, stride, padding)
+        # input 維度 [3, 128, 128]
+        self.cnn = nn.Sequential(
+            nn.Conv2d(3, 64, 3, 1, 1),  # [64, 128, 128]
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2, 0),      # [64, 64, 64]
+
+            nn.Conv2d(64, 128, 3, 1, 1), # [128, 64, 64]
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2, 0),      # [128, 32, 32]
+
+            nn.Conv2d(128, 256, 3, 1, 1), # [256, 32, 32]
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2, 0),      # [256, 16, 16]
+
+            nn.Conv2d(256, 512, 3, 1, 1), # [512, 16, 16]
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2, 0),       # [512, 8, 8]
+            
+            nn.Conv2d(512, 512, 3, 1, 1), # [512, 8, 8]
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2, 0),       # [512, 4, 4]
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(25088, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Linear(512, 11)
+        )
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.view(out.size()[0], -1)
+        return self.fc(out)
 #%%
 
 model1_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model1_best.ckpt'
@@ -239,6 +304,8 @@ model3_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model3_best.
 model4_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model4_best.ckpt'
 model5_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model5_best.ckpt'
 model6_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model6_best.ckpt'
+model7_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model7_best.ckpt'
+model8_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/gradescope_hw3_best.ckpt'
 
 # The number of batch size.
 batch_size = 64
@@ -265,6 +332,10 @@ model5 = MyModel5().to(device)
 model5.load_state_dict(torch.load(model5_path))
 model6 = MyModel6().to(device)
 model6.load_state_dict(torch.load(model6_path))
+model7 = MyModel7().to(device)
+model7.load_state_dict(torch.load(model7_path))
+model8 = Classifier().to(device)
+model8.load_state_dict(torch.load(model8_path))
 
 
 #%%
@@ -276,6 +347,8 @@ model3.eval()
 model4.eval() 
 model5.eval() 
 model6.eval() 
+model7.eval() 
+model8.eval() 
 
 #reference: https://github.com/pai4451/ML2021/blob/main/hw3/Ensemble2.ipynb
 
@@ -290,7 +363,10 @@ for batch in tqdm(test_loader):
         logits4 = model4(inputs)
         logits5 = model5(inputs)
         logits6 = model6(inputs)
-        logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6) / 6
+        logits7 = model7(inputs)
+        logits8 = model8(inputs)
+        #logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 + logits7) / 7
+        logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 + logits7 + logits8) / 8
 
     # Take the class with greatest logit as prediction and record it.
     predict.extend(logits.argmax(dim=-1).cpu().numpy().tolist())
@@ -301,7 +377,6 @@ with open('/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_
     f.write('Id,Category\n')
     for i, y in enumerate(predict):
         f.write(f"{i},{y}\n")
-
 
 
 #%%
