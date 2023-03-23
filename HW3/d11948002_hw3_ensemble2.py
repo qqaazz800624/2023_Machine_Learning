@@ -104,7 +104,7 @@ class FoodDataset(Dataset):
         return im,label
 
 # "cuda" only when GPUs are available.
-device = "cuda:3" if torch.cuda.is_available() else "cuda:1"
+device = "cuda:2" if torch.cuda.is_available() else "cuda:0"
 
 #%%
 
@@ -365,7 +365,7 @@ for batch in tqdm(test_loader):
         logits6 = model6(inputs)
         logits7 = model7(inputs)
         logits8 = model8(inputs)
-        #logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 + logits7) / 7
+        #logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 ) / 6
         logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 + logits7 + logits8) / 8
 
     # Take the class with greatest logit as prediction and record it.

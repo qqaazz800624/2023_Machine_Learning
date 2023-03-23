@@ -153,7 +153,7 @@ class FoodDataset(Dataset):
 #%% load pretrained model architecture
 
 # "cuda" only when GPUs are available.
-device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
+device = "cuda:3" if torch.cuda.is_available() else "cuda:0"
 
 class MyModel(nn.Module):
     def __init__(self):
