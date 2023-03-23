@@ -19,6 +19,8 @@ import csv
 
 #%%
 
+_exp = 'model1'
+
 def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
@@ -31,7 +33,6 @@ def set_seed(seed):
 
 set_seed(77)
 
-#%%
 
  
 class myDataset(Dataset):
@@ -79,8 +80,6 @@ class myDataset(Dataset):
 		return self.speaker_num
 
 
-#%%
-
 
 def collate_batch(batch):
 	# Process features within a batch.
@@ -124,8 +123,10 @@ def get_dataloader(data_dir, batch_size, n_workers):
 
 #%%
 
+#reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw4/hw4.ipynb
+
 class Classifier(nn.Module):
-	def __init__(self, d_model=80, n_spks=600, dropout=0.1):
+	def __init__(self, d_model=240, n_spks=600, dropout=0.1):
 		super().__init__()
 		# Project the dimension of features from that of input into d_model.
 		self.prenet = nn.Linear(40, d_model)
@@ -133,9 +134,9 @@ class Classifier(nn.Module):
 		#   Change Transformer to Conformer.
 		#   https://arxiv.org/abs/2005.08100
 		self.encoder_layer = nn.TransformerEncoderLayer(
-			d_model=d_model, dim_feedforward=256, nhead=2
-		)
-		# self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=2)
+								d_model=d_model, dim_feedforward=256, nhead=4
+									)
+		self.encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=3)
 
 		# Project the the dimension of features from d_model into speaker nums.
 		self.pred_layer = nn.Sequential(
@@ -168,6 +169,34 @@ class Classifier(nn.Module):
 
 
 #%%
+
+import math
+# https://d2l.ai/chapter_optimization/lr-scheduler.html
+# https://hackmd.io/@Hong-Jia/H1hmbNr1d
+# reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw4/hw4.ipynb
+class CosineScheduler:
+    def __init__(self, max_update, base_lr=0.01, final_lr=0,
+               warmup_steps=0, warmup_begin_lr=0):
+        self.base_lr_orig = base_lr
+        self.max_update = max_update
+        self.final_lr = final_lr
+        self.warmup_steps = warmup_steps
+        self.warmup_begin_lr = warmup_begin_lr
+        self.max_steps = self.max_update - self.warmup_steps
+
+    def get_warmup_lr(self, epoch):
+        increase = (self.base_lr_orig - self.warmup_begin_lr) \
+                       * float(epoch) / float(self.warmup_steps)
+        return self.warmup_begin_lr + increase
+
+    def __call__(self, epoch):
+        if epoch < self.warmup_steps:
+            return self.get_warmup_lr(epoch)
+        if epoch <= self.max_update:
+            self.base_lr = self.final_lr + (
+                self.base_lr_orig - self.final_lr) * (1 + math.cos(
+                math.pi * (epoch - self.warmup_steps) / self.max_steps)) / 2
+        return self.base_lr
 
 def get_cosine_schedule_with_warmup(
 	optimizer: Optimizer,
@@ -209,7 +238,7 @@ def get_cosine_schedule_with_warmup(
 			0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress))
 		)
 
-	return LambdaLR(optimizer, lr_lambda, last_epoch)
+	return LambdaLR(optimizer, CosineScheduler(max_update=150000, base_lr=1, final_lr=0.005, warmup_steps=1e3), last_epoch)
 
 
 #%%
@@ -267,18 +296,20 @@ def valid(dataloader, model, criterion, device):
 def parse_args():
 	"""arguments"""
 	config = {
-		"data_dir": "./Dataset",
-		"save_path": "model.ckpt",
-		"batch_size": 32,
+		"data_dir": "/neodata/ML/hw4_dataset",
+		"save_path": f"/home/u/qqaazz800624/2023_Machine_Learning/HW4/ckpts/d11948002_hw4_{_exp}.ckpt",
+		"batch_size": 64,
 		"n_workers": 8,
 		"valid_steps": 2000,
 		"warmup_steps": 1000,
 		"save_steps": 10000,
-		"total_steps": 70000,
+		"total_steps": 200000,
+		"n_d_model": 240
 	}
 
 	return config
 
+#%%
 
 def main(
 	data_dir,
@@ -289,16 +320,18 @@ def main(
 	warmup_steps,
 	total_steps,
 	save_steps,
+	n_d_model
 ):
 	"""Main function."""
-	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	device = torch.device("cuda:1" if torch.cuda.is_available() else "cuda:0")
 	print(f"[Info]: Use {device} now!")
 
 	train_loader, valid_loader, speaker_num = get_dataloader(data_dir, batch_size, n_workers)
 	train_iterator = iter(train_loader)
 	print(f"[Info]: Finish loading data!",flush = True)
 
-	model = Classifier(n_spks=speaker_num).to(device)
+	#model = Classifier(n_spks=speaker_num).to(device)
+	model = Classifier(d_model=n_d_model, n_spks=speaker_num).to(device)
 	criterion = nn.CrossEntropyLoss()
 	optimizer = AdamW(model.parameters(), lr=1e-3)
 	scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
@@ -396,11 +429,11 @@ from tqdm.notebook import tqdm
 def parse_args():
 	"""arguments"""
 	config = {
-		"data_dir": "./Dataset",
-		"model_path": "./model.ckpt",
-		"output_path": "./output.csv",
+		"data_dir": "/neodata/ML/hw4_dataset",
+		"model_path": f"/home/u/qqaazz800624/2023_Machine_Learning/HW4/ckpts/d11948002_hw4_{_exp}.ckpt",
+		"output_path": f"/home/u/qqaazz800624/2023_Machine_Learning/HW4/outputs/d11948002_hw4_{_exp}.csv",
+		"n_d_model": 240
 	}
-
 	return config
 
 
@@ -408,9 +441,10 @@ def main(
 	data_dir,
 	model_path,
 	output_path,
+	n_d_model
 ):
 	"""Main function."""
-	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	device = torch.device("cuda:1" if torch.cuda.is_available() else "cuda:0")
 	print(f"[Info]: Use {device} now!")
 
 	mapping_path = Path(data_dir) / "mapping.json"
@@ -428,7 +462,8 @@ def main(
 	print(f"[Info]: Finish loading data!",flush = True)
 
 	speaker_num = len(mapping["id2speaker"])
-	model = Classifier(n_spks=speaker_num).to(device)
+	#model = Classifier(n_spks=speaker_num).to(device)
+	model = Classifier(d_model=n_d_model, n_spks=speaker_num).to(device)
 	model.load_state_dict(torch.load(model_path))
 	model.eval()
 	print(f"[Info]: Finish creating model!",flush = True)
