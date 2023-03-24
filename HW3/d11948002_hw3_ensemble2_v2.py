@@ -100,9 +100,9 @@ class FoodDataset(Dataset):
         return im,label
 
 # "cuda" only when GPUs are available.
-device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
+device = "cuda:2" if torch.cuda.is_available() else "cuda:0"
 
-
+#%%
 
 class MyModel1(nn.Module):
     def __init__(self):
@@ -292,28 +292,7 @@ class Classifier(nn.Module):
         out = self.cnn(x)
         out = out.view(out.size()[0], -1)
         return self.fc(out)
-
-
-class MyModel8(nn.Module):
-    def __init__(self):
-        super(MyModel8, self).__init__()
-        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-        # torch.nn.MaxPool2d(kernel_size, stride, padding)
-        # input 維度 [3, 128, 128]
-        self.cnn = models.vgg13(weights=False).to(device)
-        self.fc = nn.Sequential(
-                        nn.Linear(1000, 1024),
-                        nn.ReLU(),
-                        nn.Linear(1024, 512),
-                        nn.ReLU(),
-                        nn.Linear(512, 11)
-                        ).to(device)
-
-    def forward(self, x):
-        out = self.cnn(x)
-        out = out.view(out.size()[0], -1)
-        return self.fc(out)
-
+#%%
 
 model1_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model1_best.ckpt'
 model2_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model2_best.ckpt'
@@ -322,9 +301,9 @@ model4_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model4_best.
 model5_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model5_best.ckpt'
 model6_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model6_best.ckpt'
 model7_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model7_best.ckpt'
-classifier_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/gradescope_hw3_best.ckpt'
-model8_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model8_best.ckpt'
+model8_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/gradescope_hw3_best.ckpt'
 
+model_paths = [model1_path, model2_path, model3_path, model4_path, model5_path, model6_path, model7_path, model8_path]
 
 # The number of batch size.
 batch_size = 64
@@ -338,66 +317,33 @@ test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_wor
 
 #%%
 
-model1 = MyModel1().to(device)
-model1.load_state_dict(torch.load(model1_path, map_location=device))
-model2 = MyModel2().to(device)
-model2.load_state_dict(torch.load(model2_path, map_location=device))
-model3 = MyModel3().to(device)
-model3.load_state_dict(torch.load(model3_path, map_location=device))
-model4 = MyModel4().to(device)
-model4.load_state_dict(torch.load(model4_path, map_location=device))
-model5 = MyModel5().to(device)
-model5.load_state_dict(torch.load(model5_path, map_location=device))
-model6 = MyModel6().to(device)
-model6.load_state_dict(torch.load(model6_path, map_location=device))
-model7 = MyModel7().to(device)
-model7.load_state_dict(torch.load(model7_path, map_location=device))
-classifier = Classifier().to(device)
-classifier.load_state_dict(torch.load(classifier_path, map_location=device))
-model8 = MyModel8().to(device)
-model8.load_state_dict(torch.load(model8_path, map_location=device))
-
+model_list = [MyModel1, MyModel2, MyModel3, MyModel4, 
+              MyModel5, MyModel6, MyModel7, Classifier]
+csv_name = ['model1', 'model2', 'model3', 'model4',
+            'model5', 'model6', 'model7', 'gradescope']
 
 #%%
-#set models to evaluation mode
-predict = []
-model1.eval() 
-model2.eval() 
-model3.eval() 
-model4.eval() 
-model5.eval() 
-model6.eval() 
-model7.eval() 
-classifier.eval()
-model8.eval() 
+for model, path in zip(model_list, model_paths):
+    model = model().to(device)
+    model.load_state_dict(torch.load(path))
+    predict = []
+    model.eval() 
+    for batch in tqdm(test_loader):
+        imgs, labels = batch
 
-#reference: https://github.com/pai4451/ML2021/blob/main/hw3/Ensemble2.ipynb
+        with torch.no_grad():
+            inputs = imgs.to(device)
+            logits = model(inputs)
+        predict.extend(logits.cpu().numpy().tolist())
 
-for batch in tqdm(test_loader):
-    imgs, labels = batch
+    for name in csv_name:
+        with open(f'/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_{name}_logit.csv', 'w') as f:
+            f.write('Id,Category\n')
+            for i, y in enumerate(predict):
+                f.write(f"{i},{y}\n")
 
-    with torch.no_grad():
-        inputs = imgs.to(device)
-        logits1 = model1(inputs)
-        logits2 = model2(inputs)
-        logits3 = model3(inputs)
-        logits4 = model4(inputs)
-        logits5 = model5(inputs)
-        logits6 = model6(inputs)
-        logits7 = model7(inputs)
-        logits8 = classifier(inputs)
-        logits9 = model8(inputs)
-        logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 + logits7 + logits8 + logits8) / 9
+    del model
 
-    # Take the class with greatest logit as prediction and record it.
-    predict.extend(logits.argmax(dim=-1).cpu().numpy().tolist())
-
-#%%
-
-with open('/home/u/qqaazz800624/2023_Machine_Learning/HW3/outputs/d11948002_hw3_ensemble2.csv', 'w') as f:
-    f.write('Id,Category\n')
-    for i, y in enumerate(predict):
-        f.write(f"{i},{y}\n")
 
 
 #%%
