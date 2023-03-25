@@ -315,6 +315,49 @@ class MyModel8(nn.Module):
         return self.fc(out)
 
 
+class MyModel9(nn.Module):
+    def __init__(self):
+        super(MyModel9, self).__init__()
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        # torch.nn.MaxPool2d(kernel_size, stride, padding)
+        # input 維度 [3, 128, 128]
+        self.cnn = models.efficientnet_b0(weights=False).to(device)
+        self.fc = nn.Sequential(
+                        nn.Linear(1000, 1024),
+                        nn.ReLU(),
+                        nn.Linear(1024, 512),
+                        nn.ReLU(),
+                        nn.Linear(512, 11)
+                        ).to(device)
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.view(out.size()[0], -1)
+        return self.fc(out)
+
+
+
+class MyModel10(nn.Module):
+    def __init__(self):
+        super(MyModel10, self).__init__()
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        # torch.nn.MaxPool2d(kernel_size, stride, padding)
+        # input 維度 [3, 128, 128]
+        self.cnn = models.efficientnet_b1(weights=False).to(device)
+        self.fc = nn.Sequential(
+                        nn.Linear(1000, 1024),
+                        nn.ReLU(),
+                        nn.Linear(1024, 512),
+                        nn.ReLU(),
+                        nn.Linear(512, 11)
+                        ).to(device)
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.view(out.size()[0], -1)
+        return self.fc(out)
+
+
 model1_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model1_best.ckpt'
 model2_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model2_best.ckpt'
 model3_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model3_best.ckpt'
@@ -324,6 +367,8 @@ model6_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model6_best.
 model7_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model7_best.ckpt'
 classifier_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/gradescope_hw3_best.ckpt'
 model8_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model8_best.ckpt'
+model9_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model9_best.ckpt'
+model10_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model10_best.ckpt'
 
 
 # The number of batch size.
@@ -356,6 +401,10 @@ classifier = Classifier().to(device)
 classifier.load_state_dict(torch.load(classifier_path, map_location=device))
 model8 = MyModel8().to(device)
 model8.load_state_dict(torch.load(model8_path, map_location=device))
+model9 = MyModel9().to(device)
+model9.load_state_dict(torch.load(model9_path, map_location=device))
+model10 = MyModel10().to(device)
+model10.load_state_dict(torch.load(model10_path, map_location=device))
 
 
 #%%
@@ -370,6 +419,8 @@ model6.eval()
 model7.eval() 
 classifier.eval()
 model8.eval() 
+model9.eval() 
+model10.eval() 
 
 #reference: https://github.com/pai4451/ML2021/blob/main/hw3/Ensemble2.ipynb
 
@@ -387,7 +438,11 @@ for batch in tqdm(test_loader):
         logits7 = model7(inputs)
         logits8 = classifier(inputs)
         logits9 = model8(inputs)
-        logits = (logits1 + logits2 + logits3 + logits4 + logits5 + logits6 + logits7 + logits8 + logits8) / 9
+        logits10 = model9(inputs)
+        logits11 = model10(inputs)
+        logits = (logits1 + logits2 + logits3 + logits4 + logits5 + 
+                  logits6 + logits7 + logits8 + logits9 + logits10 +
+                  logits11) / 11
 
     # Take the class with greatest logit as prediction and record it.
     predict.extend(logits.argmax(dim=-1).cpu().numpy().tolist())
