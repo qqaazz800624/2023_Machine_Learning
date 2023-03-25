@@ -50,7 +50,7 @@ test_tfm = transforms.Compose([
                 # transforms.Resize((255, 255)),
                 # transforms.CenterCrop((224, 224)),
                 transforms.ToTensor(),
-                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                 ])
 
 # However, it is also possible to use augmentation in the testing phase.
@@ -75,7 +75,7 @@ train_tfm = transforms.Compose([
     # transforms.ColorJitter(brightness=0.1,contrast=0.2,saturation=0,hue=0),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
-    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
 

@@ -6,12 +6,12 @@ reference link:
 2. https://github.com/Joshuaoneheart/ML2021-HWs
 3. https://github.com/pai4451/ML2021
 
-predefined model: efficientnet_b0
+predefined model: efficientnet_b2
 '''
 #%%
 
 
-_exp_name = "model9"
+_exp_name = "model11"
 # Import necessary packages.
 import numpy as np
 import pandas as pd
@@ -50,7 +50,7 @@ test_tfm = transforms.Compose([
                 # transforms.Resize((255, 255)),
                 # transforms.CenterCrop((224, 224)),
                 transforms.ToTensor(),
-                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                 ])
 
 # However, it is also possible to use augmentation in the testing phase.
@@ -66,6 +66,7 @@ train_tfm = transforms.Compose([
     # transforms.RandomResizedCrop((224, 224)),
     # transforms.RandomHorizontalFlip(),
     #ImageNetPolicy(),
+    transforms.AutoAugment(),
     transforms.Resize((224, 224)),
     # You may add some transforms here.
     #transforms.RandomHorizontalFlip(p=0.5), #將一半的圖片進行水平方向翻轉，因為訓練的圖片主要是食物，水平翻轉應該也要能認得出來是什麼食物
@@ -74,7 +75,7 @@ train_tfm = transforms.Compose([
     # transforms.ColorJitter(brightness=0.1,contrast=0.2,saturation=0,hue=0),
     # ToTensor() should be the last one of the transforms.
     transforms.ToTensor(),
-    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
 
@@ -104,8 +105,7 @@ class FoodDataset(Dataset):
             
         return im,label
 
-
-    
+  
 #%% load pretrained model architecture
 
 # "cuda" only when GPUs are available.
@@ -117,7 +117,7 @@ class MyModel(nn.Module):
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
-        self.cnn = models.efficientnet_b0(weights=False).to(device)
+        self.cnn = models.efficientnet_b2(weights=False).to(device)
         self.fc = nn.Sequential(
                         nn.Linear(1000, 1024),
                         nn.ReLU(),
