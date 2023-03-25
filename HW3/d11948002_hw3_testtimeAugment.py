@@ -32,51 +32,25 @@ test_tfm = transforms.Compose([
                 transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
                 ])
 
-test_tfm1 = transforms.Compose([
-                transforms.RandomRotation(10), 
-                transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
-                transforms.RandomHorizontalFlip(p=0.5), 
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
-                ])
+train_tfm = transforms.Compose([
+    transforms.RandomRotation(10), 
+    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), shear=0.1),
+    transforms.RandomHorizontalFlip(p=0.1),
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+])
 
-test_tfm2 = transforms.Compose([
-                transforms.RandomRotation(20), 
-                transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
-                transforms.RandomHorizontalFlip(p=0.2),
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) 
-                ])
-
-# test_tfm3 = transforms.Compose([
-#                 transforms.RandomRotation(20), 
-#                 transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
-#                 transforms.RandomHorizontalFlip(p=0.3),
-#                 transforms.Resize((224, 224)),
-#                 transforms.ToTensor(),
-#                 transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) 
-#                 ])
-
-# test_tfm4 = transforms.Compose([
-#                 transforms.RandomRotation(5), 
-#                 transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.1),
-#                 transforms.RandomHorizontalFlip(p=0.3),
-#                 transforms.Resize((224, 224)),
-#                 transforms.ToTensor(),
-#                 transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) 
-#                 ])
+train_tfm1 = transforms.Compose([
+    transforms.RandomRotation(5), 
+    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), shear=0.1),
+    transforms.RandomHorizontalFlip(p=0.1),
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225])
+])
 
 
-# test_tfm5 = transforms.Compose([
-#                 transforms.RandomRotation(15), 
-#                 transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=0.2),
-#                 transforms.RandomHorizontalFlip(p=0.2),
-#                 transforms.Resize((224, 224)),
-#                 transforms.ToTensor(),
-#                 transforms.Normalize([0.490, 0.455, 0.405], [0.230, 0.225, 0.225]) 
-#                 ])
 
 
 class FoodDataset(Dataset):
@@ -106,7 +80,7 @@ class FoodDataset(Dataset):
         return im,label
 
 # "cuda" only when GPUs are available.
-device = "cuda:1" if torch.cuda.is_available() else "cuda:0"
+device = "cuda:2" if torch.cuda.is_available() else "cuda:0"
 
 
 class MyModel(nn.Module):
@@ -115,7 +89,7 @@ class MyModel(nn.Module):
         # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
         # torch.nn.MaxPool2d(kernel_size, stride, padding)
         # input 維度 [3, 128, 128]
-        self.cnn = models.resnet101(weights=False).to(device)
+        self.cnn = models.efficientnet_b0(weights=False).to(device)
         self.fc = nn.Sequential(
                         nn.Linear(1000, 1024),
                         nn.ReLU(),
@@ -130,7 +104,7 @@ class MyModel(nn.Module):
         return self.fc(out)
 
 
-model_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model4_best.ckpt'
+model_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model9_best.ckpt'
 
 # The number of batch size.
 batch_size = 64
@@ -140,21 +114,15 @@ batch_size = 64
 test_set = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm)
 test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
-test_set1 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm1)
+test_set1 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=train_tfm)
 test_loader1 = DataLoader(test_set1, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-test_set2 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm2)
+test_set2 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=train_tfm1)
 test_loader2 = DataLoader(test_set2, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-# test_set3 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm3)
-# test_loader3 = DataLoader(test_set3, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-# test_set4 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm4)
-# test_loader4 = DataLoader(test_set4, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-# test_set5 = FoodDataset("/neodata/ML/hw3_dataset/test", tfm=test_tfm5)
-# test_loader5 = DataLoader(test_set5, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-#test_loaders = [test_loader, test_loader1, test_loader2, test_loader3, test_loader4, test_loader5]
+
 test_loaders = [test_loader, test_loader1, test_loader2]
 
 model = MyModel().to(device)
-model.load_state_dict(torch.load(model_path))
+model.load_state_dict(torch.load(model_path, map_location=device))
 
 
 predict = []
@@ -162,7 +130,7 @@ logits_list = []
 
 for loader in test_loaders:
     logit_temp = []
-    for batch in tqdm(test_loader):
+    for batch in tqdm(loader):
         imgs, labels = batch
 
         with torch.no_grad():
@@ -171,16 +139,14 @@ for loader in test_loaders:
         logit_temp.extend(logits)
 
     logits_list.append(logit_temp)
+
 #%%
 
 tensor_0 = torch.stack(logits_list[0])
 tensor_1 = torch.stack(logits_list[1])
 tensor_2 = torch.stack(logits_list[2])
-# tensor_3 = torch.stack(logits_list[3])
-# tensor_4 = torch.stack(logits_list[4])
-# tensor_5 = torch.stack(logits_list[5])
 
-logits = (tensor_0*0.8 + tensor_1[1]*0.1 + tensor_2[2]*0.1)
+logits = (tensor_0*0.9 + tensor_1*0.05 + tensor_2*0.05)
 
 # Take the class with greatest logit as prediction and record it.
 predict.extend(logits.argmax(dim=-1).cpu().numpy().tolist())
