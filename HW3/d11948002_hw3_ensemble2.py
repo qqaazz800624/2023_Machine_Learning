@@ -358,6 +358,27 @@ class MyModel10(nn.Module):
         return self.fc(out)
 
 
+class MyModel11(nn.Module):
+    def __init__(self):
+        super(MyModel11, self).__init__()
+        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        # torch.nn.MaxPool2d(kernel_size, stride, padding)
+        # input 維度 [3, 128, 128]
+        self.cnn = models.efficientnet_b2(weights=False).to(device)
+        self.fc = nn.Sequential(
+                        nn.Linear(1000, 1024),
+                        nn.ReLU(),
+                        nn.Linear(1024, 512),
+                        nn.ReLU(),
+                        nn.Linear(512, 11)
+                        ).to(device)
+
+    def forward(self, x):
+        out = self.cnn(x)
+        out = out.view(out.size()[0], -1)
+        return self.fc(out)
+
+
 model1_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model1_best.ckpt'
 model2_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model2_best.ckpt'
 model3_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model3_best.ckpt'
@@ -369,6 +390,7 @@ classifier_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/gradesco
 model8_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model8_best.ckpt'
 model9_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model9_best.ckpt'
 model10_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model10_best.ckpt'
+model11_path = '/home/u/qqaazz800624/2023_Machine_Learning/HW3/ckpts/model11_best.ckpt'
 
 
 # The number of batch size.
@@ -405,6 +427,8 @@ model9 = MyModel9().to(device)
 model9.load_state_dict(torch.load(model9_path, map_location=device))
 model10 = MyModel10().to(device)
 model10.load_state_dict(torch.load(model10_path, map_location=device))
+model11 = MyModel11().to(device)
+model11.load_state_dict(torch.load(model11_path, map_location=device))
 
 
 #%%
@@ -421,6 +445,7 @@ classifier.eval()
 model8.eval() 
 model9.eval() 
 model10.eval() 
+model11.eval() 
 
 #reference: https://github.com/pai4451/ML2021/blob/main/hw3/Ensemble2.ipynb
 
@@ -440,9 +465,10 @@ for batch in tqdm(test_loader):
         logits9 = model8(inputs)
         logits10 = model9(inputs)
         logits11 = model10(inputs)
+        logits12 = model11(inputs)
         logits = (logits1 + logits2 + logits3 + logits4 + logits5 + 
                   logits6 + logits7 + logits8 + logits9 + logits10 +
-                  logits11) / 11
+                  logits11 + logits12) / 12
 
     # Take the class with greatest logit as prediction and record it.
     predict.extend(logits.argmax(dim=-1).cpu().numpy().tolist())
