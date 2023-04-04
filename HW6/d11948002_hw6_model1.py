@@ -24,6 +24,7 @@ from einops.layers.torch import Rearrange
 from PIL import Image
 from tqdm.auto import tqdm
 from ema_pytorch import EMA
+from qqdm.notebook import qqdm
 
 from accelerate import Accelerator
 import matplotlib.pyplot as plt
@@ -67,9 +68,11 @@ class Dataset(Dataset):
         ## TODO: Data Augmentation ##
         #################################
         self.transform = T.Compose([
-            T.Resize(image_size),
-            T.ToTensor()
-        ])
+                                    T.Resize(image_size),
+                                    T.RandomHorizontalFlip(p=0.3),
+                                    T.ToTensor(),
+                                    T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+                                    ])
 
     def __len__(self):
         return len(self.paths)
@@ -142,7 +145,7 @@ def Downsample(dim, dim_out = None):
 class WeightStandardizedConv2d(nn.Conv2d):
     """
     https://arxiv.org/abs/1903.10520
-    weight standardization purportedly works synergistically with group normalization
+    weight standardization reportedly works synergistically with group normalization
     """
     def forward(self, x):
         eps = 1e-5 if x.dtype == torch.float32 else 1e-3
@@ -822,13 +825,13 @@ class Trainer(object):
 path = '/neodata/ML/hw6_dataset/faces'
 IMG_SIZE = 64             # Size of images, do not change this if you do not know why you need to change
 batch_size = 16
-train_num_steps = 10000        # total training steps
+train_num_steps = 40000        # total training steps
 lr = 1e-3
-grad_steps = 1            # gradient accumulation steps, the equivalent batch size for updating equals to batch_size * grad_steps = 16 * 1
+grad_steps = 2            # gradient accumulation steps, the equivalent batch size for updating equals to batch_size * grad_steps = 16 * 1
 ema_decay = 0.995           # exponential moving average decay
 
 channels = 16             # Numbers of channels of the first layer of CNN
-dim_mults = (1, 2, 4)        # The model size will be (channels, 2 * channels, 4 * channels, 4 * channels, 2 * channels, channels)
+dim_mults = (1, 2, 4, 8)        # The model size will be (channels, 2 * channels, 4 * channels, 4 * channels, 2 * channels, channels)
 
 timesteps = 100            # Number of steps (adding noise)
 beta_schedule = 'linear'
@@ -860,7 +863,7 @@ trainer.train()
 
 #%%
 
-ckpt = '/home/u/qqaazz800624/2023_Machine_Learning/HW6/ckpts/model-55.pt'
+ckpt = '/home/u/qqaazz800624/2023_Machine_Learning/HW6/results/model-40.pt'
 trainer.load(ckpt)
 trainer.inference()
 
