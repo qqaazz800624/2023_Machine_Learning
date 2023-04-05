@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 #%%
 
-_exp = 'model1'
+_exp = 'model2'
 seed = 73
 random.seed(seed)
 torch.manual_seed(seed)
