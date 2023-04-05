@@ -75,7 +75,7 @@ def get_dataset(root):
 #reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw6/hw6.ipynb
 
 temp_dataset = get_dataset(os.path.join(data_dir, 'faces'))
-images = [temp_dataset[i] for i in range(8)]
+images = [temp_dataset[i] for i in range(12)]
 grid_img = torchvision.utils.make_grid(images, nrow=4)
 plt.figure(figsize=(10,10))
 plt.imshow(grid_img.permute(1, 2, 0))
@@ -84,27 +84,25 @@ plt.show()
 #%% 
 # Training model in terminal
 import os
-command_training = 'stylegan2_pytorch --new \
-      --name d11948002_hw6_stylegan2 \
+command_training = 'stylegan2_pytorch \
       --data /neodata/ML/hw6_dataset/faces \
       --num-train-steps 20000 \
-      --results_dir /home/u/qqaazz800624/2023_Machine_Learning/HW6/results/stylegan2 \
-      --models_dir /home/u/qqaazz800624/2023_Machine_Learning/HW6/models/stylegan2 \
       --image-size 64 \
-      --network-capacity 32'
+      --network-capacity 64'
 os.system(command_training)
 
 #%% 
 # Interpolation
 
 command_interpolation = 'stylegan2_pytorch--generate-interpolation \
-                        -- name d11948002_hw6_stylegan2\
-                        -- models_dir /home/u/qqaazz800624/2023_Machine_Learning/HW6/models/stylegan2 \
                         -- interpolation-num-steps 5'
 os.system(command_interpolation)
 
 #%%
 #reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw6/hw6.ipynb
+#reference: https://github.com/Joshuaoneheart/ML2021-HWs/blob/main/hw6/hw6.sh
+#reference: https://github.com/lucidrains/stylegan2-pytorch
+
 
 import torch
 from torchvision.utils import save_image
@@ -112,14 +110,18 @@ from stylegan2_pytorch import ModelLoader
 
 loader = ModelLoader(
     base_dir = '/home/u/qqaazz800624/2023_Machine_Learning/HW6',   # path to where you invoked the command line tool
-    name = 'default'         # the project name, defaults to 'default'
+    name = 'default' ,
+    load_from = -1
 )
+#%%
 
 n_output = 1000
 noise   = torch.randn(n_output, 512) # noise
+
+#%%
 styles  = loader.noise_to_styles(noise, trunc_psi = 0.7)  # pass through mapping network
 
-imgs_sample = loader.styles_to_images(styles[:10])
+imgs_sample = loader.styles_to_images(styles[0:5])
 grid_img = torchvision.utils.make_grid(imgs_sample.cpu(), nrow=5)
 plt.figure()
 plt.imshow(grid_img.permute(1, 2, 0))
