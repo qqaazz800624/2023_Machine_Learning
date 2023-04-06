@@ -86,17 +86,12 @@ plt.show()
 import os
 command_training = 'stylegan2_pytorch \
       --data /neodata/ML/hw6_dataset/faces \
-      --num-train-steps 20000 \
+      --num-train-steps 30000 \
       --image-size 64 \
-      --network-capacity 64'
+      --multi-gpus \
+      --batch-size 32'
+
 os.system(command_training)
-
-#%% 
-# Interpolation
-
-command_interpolation = 'stylegan2_pytorch--generate-interpolation \
-                        -- interpolation-num-steps 5'
-os.system(command_interpolation)
 
 #%%
 #reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw6/hw6.ipynb

@@ -825,7 +825,7 @@ class Trainer(object):
 path = '/neodata/ML/hw6_dataset/faces'
 IMG_SIZE = 64             # Size of images, do not change this if you do not know why you need to change
 batch_size = 16
-train_num_steps = 60000        # total training steps
+train_num_steps = 80000        # total training steps
 lr = 1e-3
 grad_steps = 2            # gradient accumulation steps, the equivalent batch size for updating equals to batch_size * grad_steps = 16 * 1
 ema_decay = 0.995           # exponential moving average decay
@@ -863,7 +863,7 @@ trainer.train()
 
 #%%
 
-ckpt = '/home/u/qqaazz800624/2023_Machine_Learning/HW6/results/model-60.pt'
+ckpt = '/home/u/qqaazz800624/2023_Machine_Learning/HW6/results/diffusion/model-60.pt'
 trainer.load(ckpt)
 trainer.inference()
 
