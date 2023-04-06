@@ -1,8 +1,6 @@
-# 2023 Machine Learning HW5 Transformers
+# 2023 Machine Learning HW5: Transformers
 
 ## Step1
-    - Run d11948002_hw4_model1.py ~ run d11948002_hw4_model3.py separately. 
+    - Just run d11948002_hw5_model2.py. 
     - A warm reminder: Remember to change the directory to save checkpoints for models.
     
-## Step2
-    - Run d11948002_hw4_ensemble.py to produce d11948002_hw4_ensemble.csv.

@@ -1092,7 +1092,7 @@ None
 
 #%%
 
-def generate_prediction(model, task, split="test", outfile="/home/u/qqaazz800624/2023_Machine_Learning/HW5/outputs/d11948002_hw5_model1.txt"):    
+def generate_prediction(model, task, split="test", outfile=f"/home/u/qqaazz800624/2023_Machine_Learning/HW5/outputs/d11948002_hw5_{_exp}.txt"):    
     task.load_dataset(split=split, epoch=1)
     itr = load_data_iterator(task, split, 1, config.max_tokens, config.num_workers).next_epoch_itr(shuffle=False)
     
