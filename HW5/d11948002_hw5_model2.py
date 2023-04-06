@@ -670,6 +670,9 @@ arch_args = Namespace(
     dropout=0.1,
 )
 
+
+# reference link: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw5/hw5.ipynb
+# reference link: https://github.com/pai4451/ML2021/blob/main/hw5/hw5.ipynb
 # HINT: these patches on parameters for Transformer
 def add_transformer_args(args):
     args.encoder_attention_heads=8
