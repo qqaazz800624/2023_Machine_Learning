@@ -41,6 +41,7 @@ data_dir = '/neodata/ML/hw6_dataset/'
 # reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw6/hw6.ipynb
 
 # prepare for CrypkoDataset
+'''
 
 class CrypkoDataset(Dataset):
     def __init__(self, fnames, transform):
@@ -70,7 +71,6 @@ def get_dataset(root):
     return dataset
 
 
-#%% 
 # Show some samples in the dataset
 #reference: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw6/hw6.ipynb
 
@@ -80,6 +80,9 @@ grid_img = torchvision.utils.make_grid(images, nrow=4)
 plt.figure(figsize=(10,10))
 plt.imshow(grid_img.permute(1, 2, 0))
 plt.show()
+
+'''
+
 
 #%% 
 # Training model in terminal
