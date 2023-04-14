@@ -89,7 +89,7 @@ plt.show()
 import os
 command_training = 'stylegan2_pytorch \
       --data /neodata/ML/hw6_dataset/faces \
-      --num-train-steps 30000 \
+      --num-train-steps 50000 \
       --image-size 64 \
       --multi-gpus \
       --batch-size 32'
