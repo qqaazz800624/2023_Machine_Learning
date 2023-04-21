@@ -584,14 +584,23 @@ class GaussianDiffusion(nn.Module):
         imgs = [img]
 
         x_start = None
-        
+        save_dir = '/home/u/qqaazz800624/2023_Machine_Learning/HW6/gradescope/diffusion/'
         ###########################################
         ## TODO: plot the sampling process ##
         ###########################################
         for t in tqdm(reversed(range(0, self.num_timesteps)), desc = 'sampling loop time step', total = self.num_timesteps):
             img, x_start = self.p_sample(img, t)
             imgs.append(img)
-        
+            if t == 0 or t == 14 or t == 27 or t == 47 or t == 70:
+                utils.save_image(img[0], save_dir + str(t) + "_1" + ".jpg") 
+                utils.save_image(img[1], save_dir + str(t) + "_2" + ".jpg") 
+                utils.save_image(img[2], save_dir + str(t) + "_3" + ".jpg") 
+                utils.save_image(img[3], save_dir + str(t) + "_4" + ".jpg") 
+                utils.save_image(img[4], save_dir + str(t) + "_5" + ".jpg") 
+            # self.folder_num = getattr(self, 'folder_num', 0) + 1
+            # os.makedirs(f'/home/u/qqaazz800624/2023_Machine_Learning/HW6/results/diffusion/{self.folder_num}', exist_ok=True)
+            # utils.save_image(img, f'/home/u/qqaazz800624/2023_Machine_Learning/HW6/results/diffusion/{self.folder_num}/sample-{t}.png')
+
         ret = img if not return_all_timesteps else torch.stack(imgs, dim = 1)
 
         ret = self.unnormalize(ret)
