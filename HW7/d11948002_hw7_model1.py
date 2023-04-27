@@ -5,12 +5,12 @@ import numpy as np
 import random
 import torch
 from torch.utils.data import DataLoader, Dataset 
-from transformers import AdamW
+from transformers import AdamW, get_linear_schedule_with_warmup
 
 from tqdm.auto import tqdm
 
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
+_exp = "model1"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # Fix random seed for reproducibility
 def same_seeds(seed):
@@ -72,8 +72,8 @@ class QA_Dataset(Dataset):
         self.questions = questions
         self.tokenized_questions = tokenized_questions
         self.tokenized_paragraphs = tokenized_paragraphs
-        self.max_question_len = 150
-        self.max_paragraph_len = 350
+        self.max_question_len = 200
+        self.max_paragraph_len = 300
         
         ##### TODO: Change value of doc_stride #####
         self.doc_stride = 80
@@ -242,21 +242,21 @@ def evaluate(data, output, idx, split):
 # https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw7/hw7.ipynb
 # https://huggingface.co/transformers/v2.0.0/_modules/transformers/optimization.html
 
-from torch.optim.lr_scheduler import LambdaLR
-class WarmupLinearSchedule(LambdaLR):
-    """ Linear warmup and then linear decay.
-        Linearly increases learning rate from 0 to 1 over `warmup_steps` training steps.
-        Linearly decreases learning rate from 1. to 0. over remaining `t_total - warmup_steps` steps.
-    """
-    def __init__(self, optimizer, warmup_steps, t_total, last_epoch=-1):
-        self.warmup_steps = warmup_steps
-        self.t_total = t_total
-        super(WarmupLinearSchedule, self).__init__(optimizer, self.lr_lambda, last_epoch=last_epoch)
+# from torch.optim.lr_scheduler import LambdaLR
+# class WarmupLinearSchedule(LambdaLR):
+#     """ Linear warmup and then linear decay.
+#         Linearly increases learning rate from 0 to 1 over `warmup_steps` training steps.
+#         Linearly decreases learning rate from 1. to 0. over remaining `t_total - warmup_steps` steps.
+#     """
+#     def __init__(self, optimizer, warmup_steps, t_total, last_epoch=-1):
+#         self.warmup_steps = warmup_steps
+#         self.t_total = t_total
+#         super(WarmupLinearSchedule, self).__init__(optimizer, self.lr_lambda, last_epoch=last_epoch)
 
-    def lr_lambda(self, step):
-        if step < self.warmup_steps:
-            return float(step) / float(max(1, self.warmup_steps))
-        return max(0.0, float(self.t_total - step) / float(max(1.0, self.t_total - self.warmup_steps)))
+#     def lr_lambda(self, step):
+#         if step < self.warmup_steps:
+#             return float(step) / float(max(1, self.warmup_steps))
+#         return max(0.0, float(self.t_total - step) / float(max(1.0, self.t_total - self.warmup_steps)))
 
 
 
@@ -271,7 +271,8 @@ logging_step = 500
 learning_rate = 5e-5
 total_steps = len(train_loader) * num_epoch
 optimizer = AdamW(model.parameters(), lr=learning_rate)
-scheduler = WarmupLinearSchedule(optimizer, warmup_steps=500, t_total=total_steps)
+#scheduler = WarmupLinearSchedule(optimizer, warmup_steps=500, t_total=total_steps)
+scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=500, num_training_steps=total_steps)
 #train_batch_size = 8
 
 #### TODO: gradient_accumulation (optional)####
@@ -283,9 +284,6 @@ gradient_accumulation_steps = 8
 # dataloader
 # Note: Do NOT change batch size of dev_loader / test_loader !
 # Although batch size=1, it is actually a batch consisting of several windows from the same QA pair
-# train_loader = DataLoader(train_set, batch_size=train_batch_size, shuffle=True, pin_memory=True)
-# dev_loader = DataLoader(dev_set, batch_size=1, shuffle=False, pin_memory=True)
-# test_loader = DataLoader(test_set, batch_size=1, shuffle=False, pin_memory=True)
 
 
 # Change "fp16_training" to True to support automatic mixed 
@@ -311,6 +309,7 @@ for epoch in range(num_epoch):
     #for data in tqdm(train_loader):	
     for batch_idx, data in enumerate(tqdm(train_loader)):
         # Load all data into GPU
+        
         data = [i.to(device) for i in data]
         
         # Model inputs: input_ids, token_type_ids, attention_mask, start_positions, end_positions (Note: only "input_ids" is mandatory)
@@ -367,7 +366,7 @@ for epoch in range(num_epoch):
 # i.e. there are two files under the direcory 「saved_model」: 「pytorch_model.bin」 and 「config.json」
 # Saved model can be re-loaded using 「model = BertForQuestionAnswering.from_pretrained("saved_model")」
 print("Saving Model ...")
-model_save_dir = "saved_model" 
+model_save_dir = f"saved_model/{_exp}" 
 model.save_pretrained(model_save_dir)
 
 #%%
@@ -385,7 +384,7 @@ with torch.no_grad():
         #result.append(evaluate(data, output))
         result.append(evaluate(data, output, i, 'test'))
 
-result_file = "results/d11948002_hw7.csv"
+result_file = f"results/d11948002_hw7_{_exp}.csv"
 with open(result_file, 'w') as f:	
     f.write("ID,Answer\n")
     for i, test_question in enumerate(test_questions):
