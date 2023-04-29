@@ -76,7 +76,7 @@ class QA_Dataset(Dataset):
         self.max_paragraph_len = 300
         
         ##### TODO: Change value of doc_stride #####
-        self.doc_stride = 80
+        self.doc_stride = 100
 
         # Input sequence length = [CLS] + question + [SEP] + paragraph + [SEP]
         self.max_seq_len = 1 + self.max_question_len + 1 + self.max_paragraph_len + 1
