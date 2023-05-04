@@ -19,7 +19,7 @@ from torchsummary import summary
 _exp = 'model1'
 train = np.load('/neodata/ML/ml2023spring-hw8/trainingset.npy', allow_pickle=True)
 test = np.load('/neodata/ML/ml2023spring-hw8/testingset.npy', allow_pickle=True)
-device = "cuda:2" if torch.cuda.is_available() else "cuda:3"
+device = "cuda:0" if torch.cuda.is_available() else "cuda:3"
 
 def same_seeds(seed):
     random.seed(seed)
@@ -41,11 +41,9 @@ class fcn_autoencoder(nn.Module):
     def __init__(self):
         super(fcn_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 1024),
+            nn.Linear(64 * 64 * 3, 128),
             nn.LeakyReLU(0.1),
-            nn.Linear(1024, 512),
-            nn.LeakyReLU(0.1), 
-            nn.Linear(512, 256), 
+            nn.Linear(1024, 256),
             nn.LeakyReLU(0.1), 
             nn.Linear(256, 64)
             )    
@@ -54,10 +52,8 @@ class fcn_autoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(64, 256),
             nn.LeakyReLU(0.1), 
-            nn.Linear(256, 512),
+            nn.Linear(256, 1024),
             nn.LeakyReLU(0.1),
-            nn.Linear(512, 1024),
-            nn.ReLU(), 
             nn.Linear(1024, 64 * 64 * 3), 
             nn.Tanh()
         )
@@ -67,6 +63,7 @@ class fcn_autoencoder(nn.Module):
         x = self.decoder(x)
         return x
 
+#references: https://github.com/pai4451/ML2021/blob/main/hw8/HW08.ipynb
 
 class conv_autoencoder(nn.Module):
     def __init__(self):
@@ -76,13 +73,13 @@ class conv_autoencoder(nn.Module):
             nn.ReLU(),
             nn.Conv2d(12, 24, 4, stride=2, padding=1),        
             nn.ReLU(),
-			      nn.Conv2d(24, 48, 4, stride=2, padding=1),         
+			nn.Conv2d(24, 48, 4, stride=2, padding=1),         
             nn.ReLU(),
         )   # Hint:  dimension of latent space can be adjusted
         self.decoder = nn.Sequential(
-			      nn.ConvTranspose2d(48, 24, 4, stride=2, padding=1),
+			nn.ConvTranspose2d(48, 24, 4, stride=2, padding=1),
             nn.ReLU(),
-			      nn.ConvTranspose2d(24, 12, 4, stride=2, padding=1), 
+			nn.ConvTranspose2d(24, 12, 4, stride=2, padding=1), 
             nn.ReLU(),
             nn.ConvTranspose2d(12, 3, 4, stride=2, padding=1),
             nn.Tanh(),
@@ -191,7 +188,7 @@ from torch.optim.lr_scheduler import StepLR
 # Training hyperparameters
 num_epochs = 125
 batch_size = 128 # Hint: batch size may be lower
-learning_rate = 3e-4
+learning_rate = 1e-3
 
 # Build training dataloader
 x = torch.from_numpy(train)
@@ -283,7 +280,7 @@ model = torch.load(checkpoint_path)
 model.eval()
 
 # prediction file 
-out_file = f'result/d11948002_hw8_{_exp}.csv'
+out_file = f'results/d11948002_hw8_{_exp}.csv'
 
 #%%
 
