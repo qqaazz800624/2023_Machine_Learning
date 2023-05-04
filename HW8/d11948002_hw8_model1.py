@@ -12,13 +12,14 @@ import torchvision.models as models
 from torch.optim import Adam, AdamW
 from qqdm import qqdm, format_str
 import pandas as pd
+from torchsummary import summary
 
 #%%
 
+_exp = 'model1'
 train = np.load('/neodata/ML/ml2023spring-hw8/trainingset.npy', allow_pickle=True)
 test = np.load('/neodata/ML/ml2023spring-hw8/testingset.npy', allow_pickle=True)
 
-#%%
 
 def same_seeds(seed):
     random.seed(seed)
@@ -35,27 +36,29 @@ same_seeds(48763)
 
 #%%
 
+#references: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw8/hw8.ipynb
 class fcn_autoencoder(nn.Module):
     def __init__(self):
         super(fcn_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(), 
-            nn.Linear(64, 12), 
-            nn.ReLU(), 
-            nn.Linear(12, 3)
-        )    # Hint: dimension of latent space can be adjusted
+            nn.Linear(64 * 64 * 3, 1024),
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(0.1), 
+            nn.Linear(512, 256), 
+            nn.LeakyReLU(0.1), 
+            nn.Linear(256, 64)
+            )    
+            # Hint: dimension of latent space can be adjusted
         
         self.decoder = nn.Sequential(
-            nn.Linear(3, 12),
+            nn.Linear(64, 256),
+            nn.LeakyReLU(0.1), 
+            nn.Linear(256, 512),
+            nn.LeakyReLU(0.1),
+            nn.Linear(512, 1024),
             nn.ReLU(), 
-            nn.Linear(12, 64),
-            nn.ReLU(),
-            nn.Linear(64, 128),
-            nn.ReLU(), 
-            nn.Linear(128, 64 * 64 * 3), 
+            nn.Linear(1024, 64 * 64 * 3), 
             nn.Tanh()
         )
 
@@ -183,10 +186,12 @@ class CustomTensorDataset(TensorDataset):
 
 #%%
 
+from torch.optim.lr_scheduler import StepLR
+
 # Training hyperparameters
-num_epochs = 50
-batch_size = 2000 # Hint: batch size may be lower
-learning_rate = 1e-3
+num_epochs = 125
+batch_size = 128 # Hint: batch size may be lower
+learning_rate = 3e-4
 
 # Build training dataloader
 x = torch.from_numpy(train)
@@ -196,18 +201,20 @@ train_sampler = RandomSampler(train_dataset)
 train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
 
 # Model
-model_type = 'vae'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
+model_type = 'fcn'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
 model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'vae': VAE()}
 model = model_classes[model_type].cuda()
 
 # Loss and optimizer
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
+scheduler = StepLR(optimizer, step_size=25, gamma=0.5)
 
 #%%
 
+#summary(model, (64, 12288))
 
+#%%
 
 best_loss = np.inf
 model.train()
@@ -234,18 +241,27 @@ for epoch in qqdm_train:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+    # ===== use scheduler to adjust learning rate ===
+    #references: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw8/hw8.ipynb
+
+    scheduler.step()
+
     # ===================save_best====================
     mean_loss = np.mean(tot_loss)
     if mean_loss < best_loss:
         best_loss = mean_loss
-        torch.save(model, 'best_model_{}.pt'.format(model_type))
+        torch.save(model, 'models/best_model_{}.pt'.format(model_type))
+        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f} <-- Best model')
+    else:
+        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f}')
     # ===================log========================
     qqdm_train.set_infos({
         'epoch': f'{epoch + 1:.0f}/{num_epochs:.0f}',
         'loss': f'{mean_loss:.4f}',
     })
     # ===================save_last========================
-    torch.save(model, 'last_model_{}.pt'.format(model_type))
+    torch.save(model, 'models/last_model_{}.pt'.format(model_type))
 
 
 #%%
@@ -260,14 +276,12 @@ test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=eval
 eval_loss = nn.MSELoss(reduction='none')
 
 # load trained model
-checkpoint_path = f'last_model_{model_type}.pt'
+checkpoint_path = f'models/last_model_{model_type}.pt'
 model = torch.load(checkpoint_path)
 model.eval()
 
 # prediction file 
-out_file = 'prediction.csv'
-
-
+out_file = f'result/d11948002_hw8_{_exp}.csv'
 
 #%%
 
@@ -290,7 +304,6 @@ anomality = torch.sqrt(anomality).reshape(len(test), 1).cpu().numpy()
 
 df = pd.DataFrame(anomality, columns=['score'])
 df.to_csv(out_file, index_label = 'ID')
-
 
 #%%
 
