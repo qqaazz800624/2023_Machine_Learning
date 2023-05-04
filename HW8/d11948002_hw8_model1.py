@@ -19,7 +19,7 @@ from torchsummary import summary
 _exp = 'model1'
 train = np.load('/neodata/ML/ml2023spring-hw8/trainingset.npy', allow_pickle=True)
 test = np.load('/neodata/ML/ml2023spring-hw8/testingset.npy', allow_pickle=True)
-
+device = "cuda:2" if torch.cuda.is_available() else "cuda:3"
 
 def same_seeds(seed):
     random.seed(seed)
@@ -203,7 +203,8 @@ train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=b
 # Model
 model_type = 'fcn'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
 model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'vae': VAE()}
-model = model_classes[model_type].cuda()
+#model = model_classes[model_type].cuda()
+model = model_classes[model_type].to(device)
 
 # Loss and optimizer
 criterion = nn.MSELoss()
@@ -225,7 +226,8 @@ for epoch in qqdm_train:
     for data in train_dataloader:
 
         # ===================loading=====================
-        img = data.float().cuda()
+        #img = data.float().cuda()
+        img = data.float().to(device)
         if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
 
@@ -288,7 +290,8 @@ out_file = f'result/d11948002_hw8_{_exp}.csv'
 anomality = list()
 with torch.no_grad():
   for i, data in enumerate(test_dataloader):
-    img = data.float().cuda()
+    #img = data.float().cuda()
+    img = data.float().to(device)
     if model_type in ['fcn']:
       img = img.view(img.shape[0], -1)
     output = model(img)
