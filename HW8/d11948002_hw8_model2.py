@@ -19,6 +19,10 @@ from torchsummary import summary
 _exp = 'model2'
 train = np.load('/neodata/ML/ml2023spring-hw8/trainingset.npy', allow_pickle=True)
 test = np.load('/neodata/ML/ml2023spring-hw8/testingset.npy', allow_pickle=True)
+
+print(train.shape)
+print(test.shape)
+#%%
 device = "cuda:0" if torch.cuda.is_available() else "cuda:3"
 
 def same_seeds(seed):
@@ -31,7 +35,7 @@ def same_seeds(seed):
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-same_seeds(1111)
+same_seeds(48763)
 
 
 #%%
@@ -79,25 +83,19 @@ class conv_autoencoder(nn.Module):
     def __init__(self):
         super(conv_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 128, 4, stride=2, padding=1),
-            nn.BatchNorm2d(128),
+            nn.Conv2d(3, 12, 4, stride=2, padding=1),         
             nn.ReLU(),
-            nn.Conv2d(128, 256, 4, stride=2, padding=1),  
-            nn.BatchNorm2d(256),
+            nn.Conv2d(12, 24, 4, stride=2, padding=1),        
             nn.ReLU(),
-            nn.Conv2d(256, 512, 4, stride=2, padding=1),
-            nn.BatchNorm2d(512),
+			nn.Conv2d(24, 48, 4, stride=2, padding=1),         
             nn.ReLU(),
         )   # Hint:  dimension of latent space can be adjusted
-
         self.decoder = nn.Sequential(
-			nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1),
-            nn.BatchNorm2d(256),
+			nn.ConvTranspose2d(48, 24, 4, stride=2, padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1),
-            nn.BatchNorm2d(128),
+			nn.ConvTranspose2d(24, 12, 4, stride=2, padding=1), 
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 3, 4, stride=2, padding=1),
+            nn.ConvTranspose2d(12, 3, 4, stride=2, padding=1),
             nn.Tanh(),
         )
 
@@ -107,158 +105,41 @@ class conv_autoencoder(nn.Module):
         return x
 
 
-class VAE(nn.Module):
-    def __init__(self):
-        super(VAE, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 12, 4, stride=2, padding=1),            
-            nn.ReLU(),
-            nn.Conv2d(12, 24, 4, stride=2, padding=1),    
-            nn.ReLU(),
-        )
-        self.enc_out_1 = nn.Sequential(
-            nn.Conv2d(24, 48, 4, stride=2, padding=1),  
-            nn.ReLU(),
-        )
-        self.enc_out_2 = nn.Sequential(
-            nn.Conv2d(24, 48, 4, stride=2, padding=1),
-            nn.ReLU(),
-        )
-        # Hint: can add more layers to encoder and decoder
+class ResNetEncoder(nn.Module):
+    def __init__(self, encoding_dim):
+        super(ResNetEncoder, self).__init__()
+
+        resnet = models.resnet18(pretrained=True)
+        self.encoder = nn.Sequential(*list(resnet.children())[:-1])
+
+        self.fc = nn.Linear(resnet.fc.in_features, encoding_dim)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = torch.flatten(x, start_dim=1)
+        encoded = self.fc(x)
+        return encoded
+
+
+class Autoencoder(nn.Module):
+    def __init__(self, encoding_dim):
+        super(Autoencoder, self).__init__()
+
+        self.encoder = ResNetEncoder(encoding_dim)
         self.decoder = nn.Sequential(
-			      nn.ConvTranspose2d(48, 24, 4, stride=2, padding=1), 
-                  nn.ReLU(),
-			      nn.ConvTranspose2d(24, 12, 4, stride=2, padding=1), 
-                  nn.ReLU(),
-                  nn.ConvTranspose2d(12, 3, 4, stride=2, padding=1), 
-                  nn.Tanh(),
+            nn.Linear(encoding_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 64 * 64 * 3),
+            nn.Sigmoid()
         )
-
-    def encode(self, x):
-        h1 = self.encoder(x)
-        return self.enc_out_1(h1), self.enc_out_2(h1)
-
-    def reparametrize(self, mu, logvar):
-        std = logvar.mul(0.5).exp_()
-        if torch.cuda.is_available():
-            eps = torch.cuda.FloatTensor(std.size()).normal_()
-        else:
-            eps = torch.FloatTensor(std.size()).normal_()
-        eps = Variable(eps)
-        return eps.mul(std).add_(mu)
-
-    def decode(self, z):
-        return self.decoder(z)
 
     def forward(self, x):
-        mu, logvar = self.encode(x)
-        z = self.reparametrize(mu, logvar)
-        return self.decode(z), mu, logvar
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
 
-
-def loss_vae(recon_x, x, mu, logvar, criterion):
-    """
-    recon_x: generating images
-    x: origin images
-    mu: latent mean
-    logvar: latent log variance
-    """
-    mse = criterion(recon_x, x)
-    KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
-    KLD = torch.sum(KLD_element).mul_(-0.5)
-    return mse + KLD
-
-
-#references: https://github.com/pai4451/ML2021/blob/main/hw8/HW08.ipynb
-
-class Resnet(nn.Module):
-    def __init__(self, fc_hidden1=1024, fc_hidden2=768, drop_p=0.3, CNN_embed_dim=256):
-        super(Resnet, self).__init__()
-
-        self.fc_hidden1, self.fc_hidden2, self.CNN_embed_dim = fc_hidden1, fc_hidden2, CNN_embed_dim
-
-        # CNN architechtures
-        self.ch1, self.ch2, self.ch3, self.ch4 = 16, 32, 64, 128
-        self.k1, self.k2, self.k3, self.k4 = (5, 5), (3, 3), (3, 3), (3, 3)      # 2d kernal size
-        self.s1, self.s2, self.s3, self.s4 = (2, 2), (2, 2), (2, 2), (2, 2)      # 2d strides
-        self.pd1, self.pd2, self.pd3, self.pd4 = (0, 0), (0, 0), (0, 0), (0, 0)  # 2d padding
-
-        # encoding components
-        resnet = models.resnet18(pretrained=False)
-        modules = list(resnet.children())[:-1]      # delete the last fc layer.
-        self.resnet = nn.Sequential(*modules)
-        self.fc1 = nn.Linear(resnet.fc.in_features, self.fc_hidden1)
-        self.bn1 = nn.BatchNorm1d(self.fc_hidden1, momentum=0.01)
-        self.fc2 = nn.Linear(self.fc_hidden1, self.fc_hidden2)
-        self.bn2 = nn.BatchNorm1d(self.fc_hidden2, momentum=0.01)
-
-        self.fc3_mu = nn.Linear(self.fc_hidden2, self.CNN_embed_dim)      # output = CNN embedding latent variables
-
-        # Sampling vector
-        self.fc4 = nn.Linear(self.CNN_embed_dim, self.fc_hidden2)
-        self.fc_bn4 = nn.BatchNorm1d(self.fc_hidden2)
-        self.fc5 = nn.Linear(self.fc_hidden2, 64 * 4 * 4)
-        self.fc_bn5 = nn.BatchNorm1d(64 * 4 * 4)
-        self.relu = nn.ReLU(inplace=True)
-
-        # Decoder
-        self.convTrans6 = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=self.k4, stride=self.s4,
-                               padding=self.pd4),
-            nn.BatchNorm2d(32, momentum=0.01),
-            nn.ReLU(inplace=True),
-        )
-        self.convTrans7 = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=32, out_channels=8, kernel_size=self.k3, stride=self.s3,
-                               padding=self.pd3),
-            nn.BatchNorm2d(8, momentum=0.01),
-            nn.ReLU(inplace=True),
-        )
-
-        self.convTrans8 = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=8, out_channels=3, kernel_size=self.k2, stride=self.s2,
-                               padding=self.pd2),
-            nn.BatchNorm2d(3, momentum=0.01),
-            nn.Sigmoid()    # y = (y1, y2, y3) \in [0 ,1]^3
-        )
-
-
-    def encode(self, x):
-        x = self.resnet(x)  # ResNet
-        x = x.view(x.size(0), -1)  # flatten output of conv
-
-        # FC layers
-        if x.shape[0] > 1:
-            x = self.bn1(self.fc1(x))
-        else:
-            x = self.fc1(x)
-        x = self.relu(x)
-        if x.shape[0] > 1:
-            x = self.bn2(self.fc2(x))
-        else:
-            x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3_mu(x)
-        return x
-
-    def decode(self, z):
-        if z.shape[0] > 1:
-            x = self.relu(self.fc_bn4(self.fc4(z)))
-            x = self.relu(self.fc_bn5(self.fc5(x))).view(-1, 64, 4, 4)
-        else:
-            x = self.relu(self.fc4(z))
-            x = self.relu(self.fc5(x)).view(-1, 64, 4, 4)
-        x = self.convTrans6(x)
-        x = self.convTrans7(x)
-        x = self.convTrans8(x)
-        x = F.interpolate(x, size=(64, 64), mode='bilinear', align_corners=True)
-        return x
-
-    def forward(self, x):
-        z = self.encode(x)
-        x_reconst = self.decode(z)
-
-        return x_reconst
 
 #%%
 
@@ -292,34 +173,34 @@ class CustomTensorDataset(TensorDataset):
 #%%
 
 # Training hyperparameters
-num_epochs = 200
+num_epochs = 240
 batch_size = 256 # Hint: batch size may be lower
-learning_rate = 3e-4
+learning_rate = 8e-4
+num_workers = 2
 
 # Build training dataloader
 x = torch.from_numpy(train)
 train_dataset = CustomTensorDataset(x)
 
 train_sampler = RandomSampler(train_dataset)
-train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
+train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size
+                              , num_workers=num_workers, pin_memory=True, drop_last=True)
 
+encoding_dim = 64*64*3
 # Model
-model_type = 'fcn'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
-model_classes = {'resnet': Resnet(),'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'vae': VAE()}
-#model = model_classes[model_type].cuda()
+model_type = 'resnet'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
+model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'resnet': Autoencoder(encoding_dim=encoding_dim)}
 model = model_classes[model_type].to(device)
 
 # Loss and optimizer
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingWarmRestarts
+
 total_steps = len(train_dataloader) * num_epochs
-break_steps = int(0.05 * total_steps)
-from torch.optim.lr_scheduler import StepLR
-scheduler = StepLR(optimizer, step_size=break_steps, gamma=0.95)
+scheduler = StepLR(optimizer, step_size=25, gamma=0.95)
 
-#%%
-
-#summary(model, (64, 12288))
 
 #%%
 
@@ -332,22 +213,12 @@ for epoch in qqdm_train:
     for data in train_dataloader:
 
         # ===================loading=====================
-        #img = data.float().cuda()
         img = data.float().to(device)
         if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
-        # if model_type in ['cnn', 'vae', 'resnet']:
-        #     img = data.float().to(device)
-        # elif model_type in ['fcn']:
-        #     img = data.float().to(device)
-        #     img = img.view(img.shape[0], -1)
-
         # ===================forward=====================
         output = model(img)
-        if model_type in ['vae']:
-            loss = loss_vae(output[0], img, output[1], output[2], criterion)
-        else:
-            loss = criterion(output, img)
+        loss = criterion(output, img)
 
         tot_loss.append(loss.item())
         # ===================backward====================
@@ -355,7 +226,6 @@ for epoch in qqdm_train:
         loss.backward()
         optimizer.step()
         scheduler.step()
-
     # ===================save_best====================
     mean_loss = np.mean(tot_loss)
     if mean_loss < best_loss:
@@ -368,7 +238,7 @@ for epoch in qqdm_train:
     })
     # ===================save_last========================
     torch.save(model, f'models/last_model_{_exp}.pt')
-
+    print(f"LR: {scheduler.get_last_lr()[0]}")
 
 #%%
 
