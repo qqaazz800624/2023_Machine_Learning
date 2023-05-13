@@ -19,6 +19,10 @@ from torchsummary import summary
 _exp = 'model1'
 train = np.load('/neodata/ML/ml2023spring-hw8/trainingset.npy', allow_pickle=True)
 test = np.load('/neodata/ML/ml2023spring-hw8/testingset.npy', allow_pickle=True)
+
+print(train.shape)
+print(test.shape)
+#%%
 device = "cuda:0" if torch.cuda.is_available() else "cuda:3"
 
 def same_seeds(seed):
@@ -41,17 +45,16 @@ class fcn_autoencoder(nn.Module):
     def __init__(self):
         super(fcn_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 128),
+            nn.Linear(64 * 64 * 3, 1024),
             nn.LeakyReLU(0.1),
             nn.Linear(1024, 256),
-            nn.LeakyReLU(0.1), 
-            nn.Linear(256, 64)
-            )    
-            # Hint: dimension of latent space can be adjusted
+            nn.LeakyReLU(0.1),
+            nn.Linear(256, 64), 
+        )
         
         self.decoder = nn.Sequential(
             nn.Linear(64, 256),
-            nn.LeakyReLU(0.1), 
+            nn.LeakyReLU(0.1),
             nn.Linear(256, 1024),
             nn.LeakyReLU(0.1),
             nn.Linear(1024, 64 * 64 * 3), 
@@ -69,21 +72,19 @@ class conv_autoencoder(nn.Module):
     def __init__(self):
         super(conv_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 12, 4, stride=2, padding=1),         
+            nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),         
             nn.ReLU(),
-            nn.Conv2d(12, 24, 4, stride=2, padding=1),        
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),        
             nn.ReLU(),
-			nn.Conv2d(24, 48, 4, stride=2, padding=1),         
-            nn.ReLU(),
-        )   # Hint:  dimension of latent space can be adjusted
+            nn.MaxPool2d(kernel_size=2, stride=2)
+            )   # Hint:  dimension of latent space can be adjusted
         self.decoder = nn.Sequential(
-			nn.ConvTranspose2d(48, 24, 4, stride=2, padding=1),
+			nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
             nn.ReLU(),
-			nn.ConvTranspose2d(24, 12, 4, stride=2, padding=1), 
-            nn.ReLU(),
-            nn.ConvTranspose2d(12, 3, 4, stride=2, padding=1),
-            nn.Tanh(),
-        )
+			nn.ConvTranspose2d(32, 3, kernel_size=2, stride=2), 
+            nn.Sigmoid(),
+            )
 
     def forward(self, x):
         x = self.encoder(x)
@@ -111,11 +112,11 @@ class VAE(nn.Module):
         # Hint: can add more layers to encoder and decoder
         self.decoder = nn.Sequential(
 			      nn.ConvTranspose2d(48, 24, 4, stride=2, padding=1), 
-            nn.ReLU(),
+                  nn.ReLU(),
 			      nn.ConvTranspose2d(24, 12, 4, stride=2, padding=1), 
-            nn.ReLU(),
-            nn.ConvTranspose2d(12, 3, 4, stride=2, padding=1), 
-            nn.Tanh(),
+                  nn.ReLU(),
+                  nn.ConvTranspose2d(12, 3, 4, stride=2, padding=1), 
+                  nn.Tanh(),
         )
 
     def encode(self, x):
@@ -183,12 +184,10 @@ class CustomTensorDataset(TensorDataset):
 
 #%%
 
-from torch.optim.lr_scheduler import StepLR
-
 # Training hyperparameters
 num_epochs = 125
 batch_size = 128 # Hint: batch size may be lower
-learning_rate = 1e-3
+learning_rate = 3e-4
 
 # Build training dataloader
 x = torch.from_numpy(train)
@@ -200,30 +199,36 @@ train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=b
 # Model
 model_type = 'fcn'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
 model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'vae': VAE()}
-#model = model_classes[model_type].cuda()
 model = model_classes[model_type].to(device)
 
 # Loss and optimizer
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = StepLR(optimizer, step_size=25, gamma=0.5)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-#%%
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingWarmRestarts
 
-#summary(model, (64, 12288))
+total_steps = len(train_dataloader) * num_epochs
+#break_steps = int(0.05 * total_steps)
+scheduler = StepLR(optimizer, step_size=25, gamma=0.95)
+# ratio_min = 50
+# scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=2, T_mult=2, eta_min=learning_rate/ratio_min)
 
 #%%
 
 best_loss = np.inf
 model.train()
+from tqdm import tqdm
 
-qqdm_train = qqdm(range(num_epochs), desc=format_str('bold', 'Description'))
-for epoch in qqdm_train:
+# qqdm_train = qqdm(range(num_epochs), desc=format_str('bold', 'Description'))
+# for epoch in qqdm_train:
+for epoch in range(num_epochs):
     tot_loss = list()
-    for data in train_dataloader:
+
+    # for data in train_dataloader:
+    train_pbar = tqdm(train_dataloader, position=0, leave=True)
+    for data in train_pbar:
 
         # ===================loading=====================
-        #img = data.float().cuda()
         img = data.float().to(device)
         if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
@@ -241,26 +246,21 @@ for epoch in qqdm_train:
         loss.backward()
         optimizer.step()
 
-    # ===== use scheduler to adjust learning rate ===
-    #references: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw8/hw8.ipynb
-
+        # ===================step log====================
+        train_pbar.set_description(f'[{epoch+1}/{num_epochs}]')
+        train_pbar.set_postfix({'loss': loss.detach().item()})
+    
+    # ===================adjust lr====================
     scheduler.step()
-
+    
     # ===================save_best====================
     mean_loss = np.mean(tot_loss)
     if mean_loss < best_loss:
         best_loss = mean_loss
-        torch.save(model, 'models/best_model_{}.pt'.format(model_type))
+        torch.save(model, f'models/best_model_{_exp}.pt')
         print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f} <-- Best model')
     else:
         print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f}')
-    # ===================log========================
-    qqdm_train.set_infos({
-        'epoch': f'{epoch + 1:.0f}/{num_epochs:.0f}',
-        'loss': f'{mean_loss:.4f}',
-    })
-    # ===================save_last========================
-    torch.save(model, 'models/last_model_{}.pt'.format(model_type))
 
 
 #%%
@@ -275,7 +275,7 @@ test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=eval
 eval_loss = nn.MSELoss(reduction='none')
 
 # load trained model
-checkpoint_path = f'models/last_model_{model_type}.pt'
+checkpoint_path = f'models/last_model_{_exp}.pt'
 model = torch.load(checkpoint_path)
 model.eval()
 
@@ -287,7 +287,6 @@ out_file = f'results/d11948002_hw8_{_exp}.csv'
 anomality = list()
 with torch.no_grad():
   for i, data in enumerate(test_dataloader):
-    #img = data.float().cuda()
     img = data.float().to(device)
     if model_type in ['fcn']:
       img = img.view(img.shape[0], -1)
