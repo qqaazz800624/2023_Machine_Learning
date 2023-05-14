@@ -14,7 +14,6 @@ from qqdm import qqdm, format_str
 import pandas as pd
 from torchsummary import summary
 
-#%%
 
 _exp = 'model2'
 train = np.load('/neodata/ML/ml2023spring-hw8/trainingset.npy', allow_pickle=True)
@@ -22,7 +21,7 @@ test = np.load('/neodata/ML/ml2023spring-hw8/testingset.npy', allow_pickle=True)
 
 print(train.shape)
 print(test.shape)
-#%%
+
 device = "cuda:0" if torch.cuda.is_available() else "cuda:3"
 
 def same_seeds(seed):
@@ -37,7 +36,6 @@ def same_seeds(seed):
 
 same_seeds(48763)
 
-
 #%%
 
 #references: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw8/hw8.ipynb
@@ -46,36 +44,37 @@ class fcn_autoencoder(nn.Module):
         super(fcn_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
             nn.Linear(64 * 64 * 3, 1024),
-            nn.LeakyReLU(0.1), 
+            nn.LeakyReLU(0.1),
+            #nn.BatchNorm1d(1024),
             nn.Linear(1024, 512),
-            nn.LeakyReLU(0.1), 
+            nn.LeakyReLU(0.1),
+            #nn.BatchNorm1d(512),
             nn.Linear(512, 256),
             nn.LeakyReLU(0.1),
-            nn.Linear(256, 128), 
-            nn.LeakyReLU(0.1),
-            nn.Linear(128, 64),
+            #nn.BatchNorm1d(256),
+            nn.Linear(256, 64), 
         )
-
+        
         self.decoder = nn.Sequential(
-            nn.Linear(64, 128),
+            nn.Linear(64, 256),
             nn.LeakyReLU(0.1),
-            nn.Linear(128, 256),
-            nn.LeakyReLU(0.1),
+            #nn.BatchNorm1d(256),
             nn.Linear(256, 512),
             nn.LeakyReLU(0.1),
+            #nn.BatchNorm1d(512),
             nn.Linear(512, 1024),
             nn.LeakyReLU(0.1),
-            nn.Linear(1024, 64 * 64 * 3), 
+            #nn.BatchNorm1d(1024),
+            nn.Linear(1024, 64 * 64 * 3),
             nn.Tanh()
         )
 
+
     def forward(self, x):
-        code = self.encoder(x)
-        # Adjust Latent Repr for Report Image
-        # code = target_code
-        y = self.decoder(code)
-        # return code, y
-        return y
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
+
 
 #references: https://github.com/pai4451/ML2021/blob/main/hw8/HW08.ipynb
 
@@ -105,43 +104,74 @@ class conv_autoencoder(nn.Module):
         return x
 
 
-class ResNetEncoder(nn.Module):
-    def __init__(self, encoding_dim):
-        super(ResNetEncoder, self).__init__()
+class MultiEncoderAutoencoder(nn.Module):
+    def __init__(self):
+        super(MultiEncoderAutoencoder, self).__init__()
+        
+        # First Encoder
+        self.encoder1 = nn.Sequential(
+            nn.Linear(64 * 64 * 3, 1024),
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 256),
+            nn.LeakyReLU(0.1),
+            nn.Linear(256, 64)
+        )
+        
+        # Second Encoder
+        self.encoder2 = nn.Sequential(
+            nn.Linear(64 * 64 * 3, 1024),
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 256),
+            nn.LeakyReLU(0.1),
+            nn.Linear(256, 64)
+        )
 
-        resnet = models.resnet18(pretrained=True)
-        self.encoder = nn.Sequential(*list(resnet.children())[:-1])
+        self.encoder3 = nn.Sequential(
+            nn.Linear(64 * 64 * 3, 1024),
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(0.1),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(0.1),
+            nn.Linear(256, 64)
+        )
 
-        self.fc = nn.Linear(resnet.fc.in_features, encoding_dim)
-
-    def forward(self, x):
-        x = self.encoder(x)
-        x = torch.flatten(x, start_dim=1)
-        encoded = self.fc(x)
-        return encoded
-
-
-class Autoencoder(nn.Module):
-    def __init__(self, encoding_dim):
-        super(Autoencoder, self).__init__()
-
-        self.encoder = ResNetEncoder(encoding_dim)
+        self.encoder4 = nn.Sequential(
+            nn.Linear(64 * 64 * 3, 1024),
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(0.1),
+            nn.Linear(512, 128),
+            nn.LeakyReLU(0.1),
+            nn.Linear(128, 64)
+        )
+        
+        # Decoder
         self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 512),
-            nn.ReLU(),
+            nn.Linear(256, 512),
+            nn.LeakyReLU(0.1),
             nn.Linear(512, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 64 * 64 * 3),
-            nn.Sigmoid()
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 64 * 64 * 3), 
+            nn.Tanh()
         )
 
     def forward(self, x):
-        encoded = self.encoder(x)
+        
+        encoded1 = self.encoder1(x)
+        encoded2 = self.encoder2(x)
+        encoded3 = self.encoder3(x)
+        encoded4 = self.encoder4(x)
+        
+        # Concatenate the encoded features
+        encoded = torch.cat((encoded1, encoded2, encoded3, encoded4), dim=1)
+        
+        # Decode the concatenated features
         decoded = self.decoder(encoded)
+        
         return decoded
 
 
-#%%
 
 class CustomTensorDataset(TensorDataset):
     """TensorDataset with support of transforms.
@@ -173,23 +203,21 @@ class CustomTensorDataset(TensorDataset):
 #%%
 
 # Training hyperparameters
-num_epochs = 240
-batch_size = 256 # Hint: batch size may be lower
-learning_rate = 8e-4
-num_workers = 2
+num_epochs = 125
+batch_size = 128 # Hint: batch size may be lower
+learning_rate = 3e-4
 
 # Build training dataloader
 x = torch.from_numpy(train)
 train_dataset = CustomTensorDataset(x)
 
 train_sampler = RandomSampler(train_dataset)
-train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size
-                              , num_workers=num_workers, pin_memory=True, drop_last=True)
+train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
 
-encoding_dim = 64*64*3
+
 # Model
-model_type = 'resnet'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
-model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'resnet': Autoencoder(encoding_dim=encoding_dim)}
+model_type = 'fcn'   
+model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'multi': MultiEncoderAutoencoder()}
 model = model_classes[model_type].to(device)
 
 # Loss and optimizer
@@ -206,16 +234,22 @@ scheduler = StepLR(optimizer, step_size=25, gamma=0.95)
 
 best_loss = np.inf
 model.train()
+from tqdm import tqdm
 
-qqdm_train = qqdm(range(num_epochs), desc=format_str('bold', 'Description'))
-for epoch in qqdm_train:
+# qqdm_train = qqdm(range(num_epochs), desc=format_str('bold', 'Description'))
+# for epoch in qqdm_train:
+for epoch in range(num_epochs):
     tot_loss = list()
-    for data in train_dataloader:
+
+    # for data in train_dataloader:
+    train_pbar = tqdm(train_dataloader, position=0, leave=True)
+    for data in train_pbar:
 
         # ===================loading=====================
         img = data.float().to(device)
         if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
+
         # ===================forward=====================
         output = model(img)
         loss = criterion(output, img)
@@ -225,20 +259,23 @@ for epoch in qqdm_train:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step()
+
+        # ===================step log====================
+        train_pbar.set_description(f'[{epoch+1}/{num_epochs}]')
+        train_pbar.set_postfix({'loss': loss.detach().item()})
+    
+    # ===================adjust lr====================
+    scheduler.step()
+    
     # ===================save_best====================
     mean_loss = np.mean(tot_loss)
     if mean_loss < best_loss:
         best_loss = mean_loss
         torch.save(model, f'models/best_model_{_exp}.pt')
-    # ===================log========================
-    qqdm_train.set_infos({
-        'epoch': f'{epoch + 1:.0f}/{num_epochs:.0f}',
-        'loss': f'{mean_loss:.4f}',
-    })
-    # ===================save_last========================
-    torch.save(model, f'models/last_model_{_exp}.pt')
-    print(f"LR: {scheduler.get_last_lr()[0]}")
+        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f} <-- Best model')
+    else:
+        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f}')
+
 
 #%%
 
@@ -252,7 +289,7 @@ test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=eval
 eval_loss = nn.MSELoss(reduction='none')
 
 # load trained model
-checkpoint_path = f'models/last_model_{_exp}.pt'
+checkpoint_path = f'models/best_model_{_exp}.pt'
 model = torch.load(checkpoint_path)
 model.eval()
 
@@ -269,6 +306,7 @@ with torch.no_grad():
         if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
         output = model(img)
+        #output = (model1(img) + model2(img))/2
 
         if model_type in ['vae']:
             output = output[0]
