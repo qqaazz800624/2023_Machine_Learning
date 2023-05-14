@@ -49,7 +49,7 @@ class fcn_autoencoder(nn.Module):
             nn.LeakyReLU(0.1),
             nn.Linear(1024, 256),
             nn.LeakyReLU(0.1),
-            nn.Linear(256, 64), 
+            nn.Linear(256, 64),
         )
         
         self.decoder = nn.Sequential(
