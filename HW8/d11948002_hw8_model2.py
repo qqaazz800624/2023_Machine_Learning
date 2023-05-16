@@ -45,30 +45,23 @@ class fcn_autoencoder(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(64 * 64 * 3, 1024),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(1024),
-            nn.Linear(1024, 512),
+            nn.BatchNorm1d(1024),
+            nn.Linear(1024, 256),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(512),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(256),
-            nn.Linear(256, 64), 
+            nn.BatchNorm1d(256),
+            nn.Linear(256, 64),
         )
         
         self.decoder = nn.Sequential(
             nn.Linear(64, 256),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(256),
-            nn.Linear(256, 512),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, 1024),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(512),
-            nn.Linear(512, 1024),
-            nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(1024),
-            nn.Linear(1024, 64 * 64 * 3),
+            nn.BatchNorm1d(1024),
+            nn.Linear(1024, 64 * 64 * 3), 
             nn.Tanh()
         )
-
 
     def forward(self, x):
         x = self.encoder(x)
