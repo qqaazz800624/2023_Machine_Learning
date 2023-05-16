@@ -213,7 +213,7 @@ train_sampler = RandomSampler(train_dataset)
 train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=batch_size)
 
 # Model
-model_type = 'multi'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
+model_type = 'fcn'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
 model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'multi': MultiEncoderAutoencoder()}
 model = model_classes[model_type].to(device)
 
@@ -235,10 +235,10 @@ eval_loss = nn.MSELoss(reduction='none')
 # load trained model
 checkpoint_path1 = 'models/best_model_model1.pt'
 checkpoint_path2 = 'models/best_model_model2.pt'
-#checkpoint_path3 = 'models/best_model_model3.pt'
+checkpoint_path3 = 'models/best_model_model3.pt'
 model1 = torch.load(checkpoint_path1)
 model2 = torch.load(checkpoint_path2)
-#model3 = torch.load(checkpoint_path3)
+model3 = torch.load(checkpoint_path3)
 model.eval()
 
 # prediction file 
@@ -255,7 +255,7 @@ with torch.no_grad():
             img = img.view(img.shape[0], -1)
         output1 = model1(img)
         output2 = model2(img)
-        #output3 = model3(img)
+        output3 = model3(img)
 
         if model_type in ['vae']:
             output = output[0]
@@ -263,9 +263,9 @@ with torch.no_grad():
         if model_type in ['fcn','multi']:
             loss1 = eval_loss(output1, img).sum(-1)
             loss2 = eval_loss(output2, img).sum(-1)
-            #loss3 = eval_loss(output3, img).sum(-1)
-            loss = (loss1 + loss2)/2
-            #loss = (loss1 + loss2 + loss3)/3
+            loss3 = eval_loss(output3, img).sum(-1)
+            #loss = (loss1 + loss2)/2
+            loss = (loss1 + loss2 + loss3)/3
         else:
             loss = eval_loss(output, img).sum([1, 2, 3])
 
