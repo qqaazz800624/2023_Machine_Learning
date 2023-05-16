@@ -45,30 +45,29 @@ class fcn_autoencoder(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(64 * 64 * 3, 1024),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(1024),
+            nn.BatchNorm1d(1024),
             nn.Linear(1024, 512),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(512),
-            nn.Linear(512, 256),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 128),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(256),
-            nn.Linear(256, 64), 
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 32),
         )
         
         self.decoder = nn.Sequential(
-            nn.Linear(64, 256),
+            nn.Linear(32, 128),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(256),
-            nn.Linear(256, 512),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 512),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(512),
+            nn.BatchNorm1d(512),
             nn.Linear(512, 1024),
             nn.LeakyReLU(0.1),
-            #nn.BatchNorm1d(1024),
-            nn.Linear(1024, 64 * 64 * 3),
+            nn.BatchNorm1d(1024),
+            nn.Linear(1024, 64 * 64 * 3), 
             nn.Tanh()
         )
-
 
     def forward(self, x):
         x = self.encoder(x)
@@ -216,7 +215,7 @@ train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=b
 
 
 # Model
-model_type = 'multi'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
+model_type = 'fcn'   
 model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'multi': MultiEncoderAutoencoder()}
 model = model_classes[model_type].to(device)
 
@@ -228,6 +227,7 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingWarmRestarts
 
 total_steps = len(train_dataloader) * num_epochs
 scheduler = StepLR(optimizer, step_size=25, gamma=0.95)
+
 
 #%%
 
@@ -246,7 +246,7 @@ for epoch in range(num_epochs):
 
         # ===================loading=====================
         img = data.float().to(device)
-        if model_type in ['fcn','multi']:
+        if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
 
         # ===================forward=====================
@@ -302,14 +302,14 @@ with torch.no_grad():
   for i, data in enumerate(test_dataloader):
         img = data.float().to(device)
 
-        if model_type in ['fcn','multi']:
+        if model_type in ['fcn']:
             img = img.view(img.shape[0], -1)
         output = model(img)
         #output = (model1(img) + model2(img))/2
 
         if model_type in ['vae']:
             output = output[0]
-        if model_type in ['fcn','multi']:
+        if model_type in ['fcn']:
             loss = eval_loss(output, img).sum(-1)
         else:
             loss = eval_loss(output, img).sum([1, 2, 3])
