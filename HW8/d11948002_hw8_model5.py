@@ -3,10 +3,11 @@
 import random
 import numpy as np
 import torch
-from torch import nn
+from torch import nn, rand
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 import torchvision.transforms as transforms
 import torch.nn.functional as F
+
 from torch.autograd import Variable
 import torchvision.models as models
 from torch.optim import Adam, AdamW
@@ -43,21 +44,32 @@ class fcn_autoencoder(nn.Module):
     def __init__(self):
         super(fcn_autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 512),
+            nn.Linear(64 * 64 * 3, 1024),
             nn.LeakyReLU(0.1),
-            nn.Linear(512, 128),
+            #nn.BatchNorm1d(1024),
+            nn.Linear(1024, 512),
             nn.LeakyReLU(0.1),
-            nn.Linear(128, 32)
+            #nn.BatchNorm1d(512),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(0.1),
+            #nn.BatchNorm1d(256),
+            nn.Linear(256, 64), 
         )
         
         self.decoder = nn.Sequential(
-            nn.Linear(32, 128),
+            nn.Linear(64, 256),
             nn.LeakyReLU(0.1),
-            nn.Linear(128, 512),
+            #nn.BatchNorm1d(256),
+            nn.Linear(256, 512),
             nn.LeakyReLU(0.1),
-            nn.Linear(512, 64 * 64 * 3), 
+            #nn.BatchNorm1d(512),
+            nn.Linear(512, 1024),
+            nn.LeakyReLU(0.1),
+            #nn.BatchNorm1d(1024),
+            nn.Linear(1024, 64 * 64 * 3),
             nn.Tanh()
         )
+
 
     def forward(self, x):
         x = self.encoder(x)
@@ -98,73 +110,43 @@ class MultiEncoderAutoencoder(nn.Module):
         super(MultiEncoderAutoencoder, self).__init__()
         
         # First Encoder
-        self.encoder1 = nn.Sequential(
+        self.encoder = nn.Sequential(
             nn.Linear(64 * 64 * 3, 1024),
             nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(1024),
             nn.Linear(1024, 256),
             nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 16)
+            nn.Linear(256, 64)
         )
         
-        # Second Encoder
-        self.encoder2 = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 1024),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(1024),
-            nn.Linear(1024, 256),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 16)
-        )
-
-        self.encoder3 = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 1024),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(1024),
-            nn.Linear(1024, 256),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 16)
-        )
-
-        self.encoder4 = nn.Sequential(
-            nn.Linear(64 * 64 * 3, 1024),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(1024),
-            nn.Linear(1024, 256),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 16)
-        )
         
         # Decoder
         self.decoder = nn.Sequential(
-            nn.Linear(64, 256),
+            nn.Linear(64, 512),
             nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 1024),
+            nn.Linear(512, 1024),
             nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(1024),
             nn.Linear(1024, 64 * 64 * 3), 
             nn.Tanh()
         )
 
+        self.classifier = nn.Sequential(
+            nn.Linear(64 * 64 * 3, 1024),
+            nn.LeakyReLU(0.1),
+            nn.Linear(1024, 128),
+            nn.LeakyReLU(0.1),
+            nn.Linear(128, 64),
+            nn.LeakyReLU(0.1),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+
     def forward(self, x):
         
-        encoded1 = self.encoder1(x)
-        encoded2 = self.encoder2(x)
-        encoded3 = self.encoder3(x)
-        encoded4 = self.encoder4(x)
+        encoded = self.encoder(x)
+        reconstruct = self.decoder(encoded)
+        pred = self.classifier(reconstruct)
         
-        # Concatenate the encoded features
-        encoded = torch.cat((encoded1, encoded2, encoded3, encoded4), dim=1)
-        
-        # Decode the concatenated features
-        decoded = self.decoder(encoded)
-        
-        return decoded
+        return pred, encoded, reconstruct
 
 
 
@@ -211,17 +193,18 @@ train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=b
 
 
 # Model
-model_type = 'fcn'   
+model_type = 'multi'   # selecting a model type from {'cnn', 'fcn', 'vae', 'resnet'}
 model_classes = {'fcn': fcn_autoencoder(), 'cnn': conv_autoencoder(), 'multi': MultiEncoderAutoencoder()}
 model = model_classes[model_type].to(device)
 
 # Loss and optimizer
-criterion = nn.MSELoss()
+reconstruction_criterion = nn.MSELoss()
+classification_criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingWarmRestarts
 
-total_steps = len(train_dataloader) * num_epochs
+#total_steps = len(train_dataloader) * num_epochs
 scheduler = StepLR(optimizer, step_size=25, gamma=0.95)
 
 
@@ -242,12 +225,26 @@ for epoch in range(num_epochs):
 
         # ===================loading=====================
         img = data.float().to(device)
-        if model_type in ['fcn','multi']:
-            img = img.view(img.shape[0], -1)
+        img = img.view(img.shape[0], -1)
 
         # ===================forward=====================
-        output = model(img)
-        loss = criterion(output, img)
+        #noisy_inputs = img + torch.randn_like(img) * 0.1  # Add random noise
+
+        real_output, latent_vector, reconstruct = model(img)
+        reconstruct = reconstruct.view(reconstruct.shape[0], -1)
+
+        real_label = torch.zeros_like(real_output).to(device)  # label 0: real images
+        fake_output = model.decoder(torch.rand_like(latent_vector).to(device))
+        fake_output = model.classifier(fake_output)
+        fake_label = torch.ones_like(fake_output).to(device)  # label 1: fake images
+
+        classifier_output = torch.cat((real_output, fake_output))
+        classifier_label = torch.cat((real_label, fake_label))
+
+        reconstruction_loss = reconstruction_criterion(reconstruct, img)
+        classification_loss = classification_criterion(classifier_output, classifier_label)
+        loss = reconstruction_loss + classification_loss
+
 
         tot_loss.append(loss.item())
         # ===================backward====================
@@ -267,9 +264,10 @@ for epoch in range(num_epochs):
     if mean_loss < best_loss:
         best_loss = mean_loss
         torch.save(model, f'models/best_model_{_exp}.pt')
-        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f} <-- Best model')
+        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, Reconstruction loss: {reconstruction_loss:.5f}, classification loss: {classification_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f} <-- Best model')
     else:
-        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f}')
+        print(f'[{epoch+1}/{num_epochs}]: Train loss: {mean_loss:.5f}, Reconstruction loss: {reconstruction_loss:.5f}, classification loss: {classification_loss:.5f}, lr = {scheduler.get_last_lr()[0]:.5f}')
+
 
 
 #%%
@@ -281,7 +279,8 @@ data = torch.tensor(test, dtype=torch.float32)
 test_dataset = CustomTensorDataset(data)
 test_sampler = SequentialSampler(test_dataset)
 test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=eval_batch_size, num_workers=1)
-eval_loss = nn.MSELoss(reduction='none')
+reconstruction_loss = nn.MSELoss(reduction='none')
+#classification_loss = nn.CrossEntropyLoss(reduction='none')
 
 # load trained model
 checkpoint_path = f'models/best_model_{_exp}.pt'
@@ -298,16 +297,12 @@ with torch.no_grad():
   for i, data in enumerate(test_dataloader):
         img = data.float().to(device)
 
-        if model_type in ['fcn','mutli']:
-            img = img.view(img.shape[0], -1)
-        output = model(img)
+        img = img.view(img.shape[0], -1)
+        output, latent_vector, reconstruct = model(img)
+        #reconstruct = reconstruct.view(reconstruct.shape[0], -1)
 
-        if model_type in ['vae']:
-            output = output[0]
-        if model_type in ['fcn','multi']:
-            loss = eval_loss(output, img).sum(-1)
-        else:
-            loss = eval_loss(output, img).sum([1, 2, 3])
+        loss = reconstruction_loss(reconstruct, img).sum(-1) 
+
         anomality.append(loss)
 anomality = torch.cat(anomality, axis=0)
 anomality = torch.sqrt(anomality).reshape(len(test), 1).cpu().numpy()

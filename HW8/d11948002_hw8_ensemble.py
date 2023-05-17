@@ -236,9 +236,11 @@ eval_loss = nn.MSELoss(reduction='none')
 checkpoint_path1 = 'models/best_model_model1.pt'
 checkpoint_path2 = 'models/best_model_model2.pt'
 checkpoint_path3 = 'models/best_model_model3.pt'
+#checkpoint_path4 = 'models/best_model_model4.pt'
 model1 = torch.load(checkpoint_path1)
 model2 = torch.load(checkpoint_path2)
 model3 = torch.load(checkpoint_path3)
+#model4 = torch.load(checkpoint_path4)
 model.eval()
 
 # prediction file 
@@ -256,6 +258,7 @@ with torch.no_grad():
         output1 = model1(img)
         output2 = model2(img)
         output3 = model3(img)
+        #output4 = model4(img)
 
         if model_type in ['vae']:
             output = output[0]
@@ -264,8 +267,10 @@ with torch.no_grad():
             loss1 = eval_loss(output1, img).sum(-1)
             loss2 = eval_loss(output2, img).sum(-1)
             loss3 = eval_loss(output3, img).sum(-1)
-            #loss = (loss1 + loss2)/2
+            #loss4 = eval_loss(output4, img).sum(-1)
+            
             loss = (loss1 + loss2 + loss3)/3
+            #loss = (loss1 + loss2 + loss3 + loss4)/4
         else:
             loss = eval_loss(output, img).sum([1, 2, 3])
 
