@@ -6,7 +6,7 @@ from pytorchcv.model_provider import get_model as ptcv_get_model
 import random
 import numpy as np
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cuda:1')
+device = torch.device('cuda:1' if torch.cuda.is_available() else 'cuda:0')
 batch_size = 8
 
 def same_seeds(seed):
@@ -153,8 +153,16 @@ alpha = 0.8/255/std
 #references: https://github.com/pai4451/ML2021/blob/main/hw10/hw10_adversarial_attack.ipynb
 def ifgsm(model, x, y, loss_fn, epsilon=epsilon, alpha=alpha, num_iter=20):
     x_adv = x
+    # write a loop of num_iter to represent the iterative times
     for i in range(num_iter):
+        # x_adv = x_adv.detach().clone()
+        # x_adv.requires_grad = True 
+        # loss = loss_fn(model(x_adv), y) 
+        # loss.backward() 
+        # grad = x_adv.grad.detach()
+        # x_adv = x_adv + alpha * grad.sign()
         x_adv = fgsm(model, x, y, loss_fn, epsilon=epsilon)
+        # clip new x_adv back to [x-epsilon, x+epsilon]
         x_adv = torch.max(torch.min(x_adv, x+epsilon), x-epsilon) 
     return x_adv
 
@@ -165,33 +173,45 @@ alpha = 2/255/std
 #references: https://github.com/yujunkuo/ML2022-Homework/blob/main/hw10/hw10_boss.ipynb
 #references: https://github.com/Harry24k/adversarial-attacks-pytorch/blob/master/torchattacks/attacks/mifgsm.py
 
-def gradcommon(model, x_adv, y, loss_fn):
-    x_adv = x_adv.detach().clone()
-    x_adv.requires_grad = True 
-    loss = loss_fn(model(input_diversity(x_adv)), y) 
-    loss.backward() 
-    grad = x_adv.grad.detach()
-    return grad, x_adv
-
-
 def difgsm(model, x, y, loss_fn, epsilon=epsilon, alpha=alpha, num_iter=20):
     x_adv = x
     for i in range(num_iter):
-        grad, x_adv = gradcommon(model, x_adv, y, loss_fn)
+        x_adv = x_adv.detach().clone()
+        x_adv.requires_grad = True 
+        
+        # ===== Replace x_adv with input_diversity =====
+        #loss = loss_fn(model(x_adv), y) 
+        loss = loss_fn(model(input_diversity(x_adv)), y) 
+
+        loss.backward() 
+        grad = x_adv.grad.detach()
         x_adv = x_adv + alpha * grad.sign()
         x_adv = torch.max(torch.min(x_adv, x+epsilon), x-epsilon) 
     return x_adv
 
+#references: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw10/hw10.ipynb
+#references: https://github.com/pai4451/ML2021/blob/main/hw10/hw10_adversarial_attack.ipynb
+#references: https://github.com/yujunkuo/ML2022-Homework/blob/main/hw10/hw10_boss.ipynb
+#references: https://github.com/Harry24k/adversarial-attacks-pytorch/blob/master/torchattacks/attacks/mifgsm.py
 
 def mifgsm(model, x, y, loss_fn, epsilon=epsilon, alpha=alpha, num_iter=20, decay=0.0):
     x_adv = x
+    # initialze momentum tensor
     momentum = torch.zeros_like(x).detach().to(device)
+    # write a loop of num_iter to represent the iterative times
     for i in range(num_iter):
-        grad, x_adv = gradcommon(model, x_adv, y, loss_fn)
+        x_adv = x_adv.detach().clone()
+        x_adv.requires_grad = True 
+        loss = loss_fn(model(input_diversity(x_adv)), y) 
+        loss.backward() 
+        grad = x_adv.grad.detach()
+
         grad = grad/torch.mean(torch.abs(grad), dim=(1,2,3), keepdim=True)
         grad = grad + momentum*decay
         momentum = grad.clone() 
+
         x_adv = x_adv + alpha * grad.sign()
+        # clip new x_adv back to [x-epsilon, x+epsilon]
         x_adv = torch.max(torch.min(x_adv, x+epsilon), x-epsilon) 
     return x_adv
 
@@ -238,6 +258,14 @@ class ensembleNet(nn.Module):
         
     def forward(self, x):
         #################### TODO: boss baseline ###################
+        # ensemble_logits = 0
+        # for i, model in enumerate(self.models):
+        #     # TODO: sum up logits from multiple models  
+        #     # return ensemble_logits
+        #     logits = model(x.clone())
+        #     ensemble_logits += logits
+        # ensemble_logits = ensemble_logits / len(self.models)
+        # return ensemble_logits
         logits = []
         for model in self.models:
             logit = model(x.clone())
@@ -275,63 +303,147 @@ print('After Ensemble')
 benign_acc, benign_loss = epoch_benign(ensemble_model, adv_loader, loss_fn)
 print(f'benign_acc = {benign_acc:.5f}, benign_loss = {benign_loss:.5f}')
 
+
 #%%
-# FGSM
 
-adv_examples, fgsm_acc, fgsm_loss = gen_adv_examples(ensemble_model, adv_loader, fgsm, loss_fn)
+
+
+import matplotlib.pyplot as plt
+
+classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+plt.figure(figsize=(10, 20))
+cnt = 0
+for i, cls_name in enumerate(classes):
+    path = f'{cls_name}/{cls_name}1.png'
+    # benign image
+    cnt += 1
+    plt.subplot(len(classes), 4, cnt)
+    im = Image.open(f'./data/{path}')
+    logit = ensemble_model(transform(im).unsqueeze(0).to(device))[0]
+    predict = logit.argmax(-1).item()
+    prob = logit.softmax(-1)[predict].item()
+    plt.title(f'benign: {cls_name}1.png\n{classes[predict]}: {prob:.2%}')
+    plt.axis('off')
+    plt.imshow(np.array(im))
+    # adversarial image
+    cnt += 1
+    plt.subplot(len(classes), 4, cnt)
+    im = Image.open(f'./fgsm/{path}')
+    logit = ensemble_model(transform(im).unsqueeze(0).to(device))[0]
+    predict = logit.argmax(-1).item()
+    prob = logit.softmax(-1)[predict].item()
+    plt.title(f'adversarial: {cls_name}1.png\n{classes[predict]}: {prob:.2%}')
+    plt.axis('off')
+    plt.imshow(np.array(im))
+plt.tight_layout()
+plt.show()
+
+
+#%%
+
+
+model = ptcv_get_model('resnet110_cifar10', pretrained=True).to(device)
+loss_fn = nn.CrossEntropyLoss()
+benign_acc, benign_loss = epoch_benign(model, adv_loader, loss_fn)
+print(f'benign_acc = {benign_acc:.5f}, benign_loss = {benign_loss:.5f}')
+
+adv_examples, fgsm_acc, fgsm_loss = gen_adv_examples(model, adv_loader, fgsm, loss_fn)
 print(f'fgsm_acc = {fgsm_acc:.5f}, fgsm_loss = {fgsm_loss:.5f}')
-
 create_dir(root, 'fgsm', adv_examples, adv_names)
 
+# original image
+path = f'dog/dog2.png'
+im = Image.open(f'./data/{path}')
+logit = model(transform(im).unsqueeze(0).to(device))[0]
+predict = logit.argmax(-1).item()
+prob = logit.softmax(-1)[predict].item()
+plt.title(f'benign: dog2.png\n{classes[predict]}: {prob:.2%}')
+plt.axis('off')
+plt.imshow(np.array(im))
+plt.tight_layout()
+plt.show()
 
-#%% 
-# I-FGSM
+# adversarial image 
+adv_im = Image.open(f'./fgsm/{path}')
+logit = model(transform(adv_im).unsqueeze(0).to(device))[0]
+predict = logit.argmax(-1).item()
+prob = logit.softmax(-1)[predict].item()
+plt.title(f'adversarial: dog2.png\n{classes[predict]}: {prob:.2%}')
+plt.axis('off')
+plt.imshow(np.array(adv_im))
+plt.tight_layout()
+plt.show()
 
-adv_examples, ifgsm_acc, ifgsm_loss = gen_adv_examples(ensemble_model, adv_loader, ifgsm, loss_fn)
-print(f'ifgsm_acc = {ifgsm_acc:.5f}, ifgsm_loss = {ifgsm_loss:.5f}')
-
-create_dir(root, 'ifgsm', adv_examples, adv_names)
-
-#%%
-# DI-FGSM
-
-adv_examples, difgsm_acc, difgsm_loss = gen_adv_examples(ensemble_model, adv_loader, difgsm, loss_fn)
-print(f'difgsm_acc = {difgsm_acc:.5f}, difgsm_loss = {difgsm_loss:.5f}')
-
-create_dir(root, 'difgsm', adv_examples, adv_names)
-
-
-#%%
-
-# MI-FGSM
-
-adv_examples, mifgsm_acc, mifgsm_loss = gen_adv_examples(ensemble_model, adv_loader, mifgsm, loss_fn)
-print(f'mifgsm_acc = {mifgsm_acc:.5f}, mifgsm_loss = {mifgsm_loss:.5f}')
-
-create_dir(root, 'mifgsm', adv_examples, adv_names)
 
 #%%
 
-'''
+import imgaug.augmenters as iaa
 
-%cd fgsm
-!tar zcvf ../fgsm.tgz *
-%cd ..
+# pre-process image
+x = transforms.ToTensor()(adv_im)*255
+x = x.permute(1, 2, 0).numpy()
+x = x.astype(np.uint8)
 
-%cd ifgsm
-!tar zcvf ../ifgsm.tgz *
-%cd ..
+# TODO: use "imgaug" package to perform JPEG compression (compression rate = 70)
+# compressed_x =  ... x .. 
 
-%cd difgsm
-!tar zcvf ../difgsm.tgz *
-%cd ..
+compressor = iaa.JpegCompression(compression=(70))
+compressed_x = compressor(images = x)
+
+logit = model(transform(compressed_x).unsqueeze(0).to(device))[0]
+predict = logit.argmax(-1).item()
+prob = logit.softmax(-1)[predict].item()
+plt.title(f'JPEG adversarial: dog2.png\n{classes[predict]}: {prob:.2%}')
+plt.axis('off')
 
 
-%cd mifgsm
-!tar zcvf ../mifgsm.tgz *
-%cd ..
+plt.imshow(compressed_x)
+plt.tight_layout()
+plt.show()
 
-'''
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
+
+
+#%%
+
+
+
 
 
 #%%
