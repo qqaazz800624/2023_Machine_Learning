@@ -12,3 +12,5 @@ playground.py
 *.gif
 saved_model
 ML_datasets
+real_or_drawing
+*.bmp
