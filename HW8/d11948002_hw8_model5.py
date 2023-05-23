@@ -199,7 +199,7 @@ model = model_classes[model_type].to(device)
 
 # Loss and optimizer
 reconstruction_criterion = nn.MSELoss()
-classification_criterion = nn.BCELoss()
+classification_criterion = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingWarmRestarts
