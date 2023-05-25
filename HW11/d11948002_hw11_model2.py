@@ -16,8 +16,8 @@ from torch.utils.data import DataLoader
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn, track
 import time
 
-_exp = 'model1'
-device = torch.device('cuda:3' if torch.cuda.is_available() else 'cuda:2')
+_exp = 'model2'
+device = torch.device('cuda:1' if torch.cuda.is_available() else 'cuda:0')
 
 
 def same_seeds(seed):
@@ -30,7 +30,7 @@ def same_seeds(seed):
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-same_seeds(42)
+same_seeds(36)
 
 
 source_transform = transforms.Compose([
@@ -151,6 +151,10 @@ feature_extractor = FeatureExtractor().to(device)
 label_predictor = LabelPredictor().to(device)
 domain_classifier = DomainClassifier().to(device)
 
+#references: https://github.com/Joshuaoneheart/ML2021-HWs/blob/main/hw11/hw11.ipynb
+feature_extractor.load_state_dict(torch.load("models/extractor_model1.bin", map_location=device))
+label_predictor.load_state_dict(torch.load("models/predictor_model1.bin", map_location=device))
+
 class_criterion = nn.CrossEntropyLoss()
 domain_criterion = nn.BCEWithLogitsLoss()
 
@@ -159,11 +163,11 @@ optimizer_C = optim.Adam(label_predictor.parameters())
 optimizer_D = optim.Adam(domain_classifier.parameters())
 
 #%%
+#references: https://github.com/Singyuan/Machine-Learning-NTUEE-2022/blob/master/hw11/hw11.ipynb
 
 def adaptive_lambda(epoch, num_epochs):
-    p = epoch / num_epochs
-    lambda_ = (2 / (1 + np.exp(-10*p))) - 1
-    return lambda_
+    lb = (2/(1 + np.exp(-10.0 * epoch/num_epochs))) - 1
+    return lb
 
 
 #%%
@@ -228,7 +232,7 @@ def train_epoch(source_dataloader, target_dataloader, progress, lamb):
     return running_D_loss / (i+1), running_F_loss / (i+1), total_hit / total_num
 
 
-num_epochs = 1400
+num_epochs = 1000
 
 with Progress(TextColumn("[progress.description]{task.description}"),
               BarColumn(),
@@ -238,7 +242,7 @@ with Progress(TextColumn("[progress.description]{task.description}"),
     epoch_tqdm = progress.add_task(description="epoch progress", total=num_epochs)
     for epoch in range(num_epochs):
         lb = adaptive_lambda(epoch, num_epochs)
-        #lb = 4+2*(1-np.exp(-0.01*epoch))
+        
         train_D_loss, train_F_loss, train_acc = train_epoch(source_dataloader, target_dataloader, progress, lamb=lb)
 
         progress.advance(epoch_tqdm, advance=1)
