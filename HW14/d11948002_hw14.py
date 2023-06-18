@@ -880,6 +880,3 @@ draw_acc(acc_list, label_list)
 
 #%%
 
-
-
-#%%
