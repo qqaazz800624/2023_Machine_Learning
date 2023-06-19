@@ -95,31 +95,6 @@ test_dataloaders = [DataLoader(data.dataset, batch_size=args.test_size, shuffle=
 
 #%%
 
-# Visualize label 0-9 1 sample MNIST picture in 5 tasks.
-sample = [Data('data', angle=angle_list[index]) for index in range(args.task_number)]
-
-plt.figure(figsize=(30, 10))
-for task in range(5):
-  target_list = []
-  cnt = 0
-  while (len(target_list) < 10):
-    img, target = sample[task].dataset[cnt]
-    cnt += 1
-    if target in target_list:
-      continue
-    else:
-      target_list.append(target)
-    plt.subplot(5, 10, (task)*10 + target + 1)
-    curr_img = np.reshape(img, (28, 28))
-    plt.matshow(curr_img, cmap=plt.get_cmap('gray'), fignum=False)
-    ax = plt.gca()
-    ax.axes.xaxis.set_ticks([])
-    ax.axes.yaxis.set_ticks([])
-    plt.title("task: " + str(task+1) + " " + "label: " + str(target), y=1)
-
-
-#%%
-
 class Model(nn.Module):
   """
   Model architecture
